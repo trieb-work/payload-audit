@@ -1,11 +1,12 @@
 # @trieb.work/payload-audit
 
-> Automatic, compliance-ready audit logging for [Payload CMS](https://payloadcms.com).
+> Automatic, compliance-ready audit logging for
+> [Payload CMS](https://payloadcms.com).
 
-A Payload CMS plugin that records an immutable audit trail of create, update, and
-delete operations across **all** collections automatically. Built to help satisfy
-the logging and accountability requirements of **NIS-2, CRA, GDPR, SEC Cyber
-Disclosure Rules, HIPAA, PCI-DSS 4.0, ISO/IEC 27001, and SOC 2**.
+A Payload CMS plugin that records an immutable audit trail of create, update,
+and delete operations across **all** collections automatically. Built to help
+satisfy the logging and accountability requirements of **NIS-2, CRA, GDPR, SEC
+Cyber Disclosure Rules, HIPAA, PCI-DSS 4.0, ISO/IEC 27001, and SOC 2**.
 
 > **Status:** Under active development. Full documentation, configuration
 > reference, and compliance mapping will be published with the first release.
