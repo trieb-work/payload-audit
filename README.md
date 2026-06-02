@@ -25,9 +25,32 @@ Cyber Disclosure Rules, HIPAA, PCI-DSS 4.0, ISO/IEC 27001, and SOC 2**.
 ```bash
 pnpm install
 pnpm dev          # start the dev Payload app (zero-config, in-memory Mongo)
-pnpm test:int     # run integration tests (Vitest)
-pnpm test:e2e     # run end-to-end tests (Playwright)
 pnpm build        # build the publishable plugin
+```
+
+### Testing
+
+The test suite is split into three layers:
+
+- **Unit tests** (`pnpm test:int`) — Fast, isolated tests for helpers
+  (`extractRequestMeta`, `resolveDocTitle`, `extractTenant`) and plugin
+  config wiring. Uses Vitest with `vite-tsconfig-paths`.
+
+- **Integration tests** (`pnpm test:int`) — Same Vitest run, but tests live
+  against a real Payload instance (via `getPayload` with the dev config and
+  `mongodb-memory-server`). Covers create/update/delete logging, upload
+  tracking, multi-tenant scoping, retention pruning, and immutability.
+
+- **E2E tests** (`pnpm test:e2e`) — Playwright tests against the running
+  admin UI. Requires a **built dev app** first:
+  ```bash
+  pnpm build:dev   # or start the dev server manually
+  pnpm test:e2e
+  ```
+
+Run everything:
+```bash
+pnpm test          # test:int + test:e2e
 ```
 
 ## License

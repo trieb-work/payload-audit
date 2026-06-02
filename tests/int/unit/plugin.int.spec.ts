@@ -57,6 +57,8 @@ describe('auditLogPlugin (config wiring)', () => {
         'docId',
         'docTitle',
         'actor',
+        'actorEmail',
+        'actorName',
         'ipAddress',
         'userAgent',
       ]),

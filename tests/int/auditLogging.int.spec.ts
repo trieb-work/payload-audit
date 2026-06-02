@@ -114,6 +114,10 @@ describe('audit logging (multi-tenant)', () => {
     const [entry] = await entriesFor('posts', String(post.id))
     const tenantId = typeof entry.tenant === 'object' ? entry.tenant?.id : entry.tenant
     expect(String(tenantId)).toBe(String(tenant.id))
+
+    // Denormalised snapshots survive tenant deletion.
+    expect(entry.tenantId).toBe(String(tenant.id))
+    expect(entry.tenantName).toBe('Acme')
   })
 })
 
@@ -125,7 +129,7 @@ describe('audit logging (immutability)', () => {
         data: { action: 'create', docId: 'x', entityCollection: 'posts' } as never,
         overrideAccess: false,
       }),
-    ).rejects.toBeTruthy()
+    ).rejects.toThrow(/not allowed to perform this action/i)
   })
 })
 
