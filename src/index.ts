@@ -7,6 +7,15 @@ export { createAuditAfterDeleteHook } from './hooks/afterDeleteHook'
 export { auditLogPlugin } from './plugin'
 
 export {
+  createPruneAuditLogsTask,
+  type CreatePruneAuditLogsTaskArgs,
+  PRUNE_AUDIT_LOGS_TASK_SLUG,
+  pruneAuditLogs,
+  type PruneAuditLogsArgs,
+  type PruneAuditLogsResult,
+} from './tasks/pruneAuditLogs'
+
+export {
   type AuditAccessConfig,
   type AuditAction,
   type AuditHookOptions,
