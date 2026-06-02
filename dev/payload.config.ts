@@ -91,6 +91,12 @@ const buildConfigWithMemoryDB = async () => {
       auditLogPlugin({
         // `pages` is intentionally excluded to exercise the disabledCollections option.
         disabledCollections: ['pages'],
+        // Exercise the retention/prune task. Small maxEntries keeps the dev
+        // trail bounded; maxAge demonstrates age-based pruning.
+        retention: {
+          maxAge: 90,
+          maxEntries: 500,
+        },
       }),
     ],
     secret: process.env.PAYLOAD_SECRET || 'dev-secret_key',
