@@ -31,6 +31,15 @@ export interface WriteAuditLogArgs {
   docTitle?: string
   /** The originating request (provides actor, IP, user agent, transaction). */
   req: PayloadRequest
+  /** Tenant id of the audited document (multi-tenant mode only). */
+  tenant?: number | string
+  /** Field name under which to store the tenant (multi-tenant mode only). */
+  tenantFieldName?: string
+  /**
+   * Snapshot of the tenant's display name (multi-tenant mode only).
+   * Best-effort: only set when the tenant field is populated.
+   */
+  tenantName?: string
 }
 
 /**
@@ -66,8 +75,18 @@ function resolveActor(
  * it, keeping the trail consistent with the audited change.
  */
 export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
-  const { action, auditCollectionSlug, authCollectionSlugs, collection, docId, docTitle, req } =
-    args
+  const {
+    action,
+    auditCollectionSlug,
+    authCollectionSlugs,
+    collection,
+    docId,
+    docTitle,
+    req,
+    tenant,
+    tenantFieldName,
+    tenantName,
+  } = args
 
   const { ipAddress, userAgent } = extractRequestMeta(req)
   const actor = resolveActor(req, authCollectionSlugs)
@@ -78,22 +97,33 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     name?: string
   } | null
 
+  const data: Record<string, unknown> = {
+    action,
+    actor: actor ?? undefined,
+    actorEmail: user?.email || undefined,
+    actorName: user?.name || undefined,
+    docId,
+    docTitle,
+    entityCollection: collection,
+    ipAddress,
+    occurredAt: new Date().toISOString(),
+    userAgent,
+  }
+
+  // Attach the tenant when multi-tenant mode is active and a tenant is known.
+  if (tenantFieldName && tenant != null) {
+    data[tenantFieldName] = tenant
+    data.tenantId = String(tenant)
+  }
+  if (tenantName != null) {
+    data.tenantName = tenantName
+  }
+
   const payload = req.payload as unknown as LooseCreatePayload
 
   await payload.create({
     collection: auditCollectionSlug,
-    data: {
-      action,
-      actor: actor ?? undefined,
-      actorEmail: user?.email || undefined,
-      actorName: user?.name || undefined,
-      docId,
-      docTitle,
-      entityCollection: collection,
-      ipAddress,
-      occurredAt: new Date().toISOString(),
-      userAgent,
-    },
+    data,
     overrideAccess: true,
     req,
   })
