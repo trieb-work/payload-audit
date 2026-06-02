@@ -63,15 +63,37 @@ export const auditLogPlugin =
       .filter((collection) => Boolean(collection.auth))
       .map((collection) => collection.slug)
 
-    // Resolve multi-tenant settings (disabled unless explicitly enabled).
+    // Resolve multi-tenant settings (disabled unless explicitly enabled or
+    // auto-detected).
     const mt = pluginConfig.multiTenant
-    const multiTenant =
-      mt?.enabled ?
-        {
-          tenantFieldName: mt.tenantFieldName ?? 'tenant',
-          tenantsCollectionSlug: mt.tenantsCollectionSlug ?? 'tenants',
+    const tenantFieldName = mt?.tenantFieldName ?? 'tenant'
+    const tenantsCollectionSlug = mt?.tenantsCollectionSlug ?? 'tenants'
+
+    let multiTenantEnabled = mt?.enabled ?? false
+    if (mt?.autoDetect && !multiTenantEnabled) {
+      for (const collection of collections) {
+        if (disabled.has(collection.slug)) {
+          continue
         }
-      : undefined
+        const hasTenantField = collection.fields?.some(
+          (field) =>
+            'name' in field &&
+            typeof field.name === 'string' &&
+            field.name === tenantFieldName,
+        )
+        if (hasTenantField) {
+          multiTenantEnabled = true
+          break
+        }
+      }
+    }
+
+    const multiTenant = multiTenantEnabled ?
+      {
+        tenantFieldName,
+        tenantsCollectionSlug,
+      }
+    : undefined
 
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {

@@ -2,7 +2,7 @@ import type { CollectionAfterChangeHook } from 'payload'
 
 import type { AuditAction, AuditHookOptions, AuditRequestContext } from '../types'
 
-import { extractTenant } from '../utils/extractTenant'
+import { extractTenant, extractTenantName } from '../utils/extractTenant'
 import { resolveDocTitle } from '../utils/resolveDocTitle'
 import { writeAuditLog } from '../utils/writeAuditLog'
 
@@ -49,6 +49,7 @@ export function createAuditAfterChangeHook(options: AuditHookOptions): Collectio
         req,
         tenant: tenantFieldName ? extractTenant(doc, tenantFieldName) : undefined,
         tenantFieldName,
+        tenantName: tenantFieldName ? extractTenantName(doc, tenantFieldName) : undefined,
       })
     } catch (error) {
       req.payload.logger.error(

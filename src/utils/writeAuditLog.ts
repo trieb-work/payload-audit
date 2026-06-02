@@ -35,6 +35,11 @@ export interface WriteAuditLogArgs {
   tenant?: number | string
   /** Field name under which to store the tenant (multi-tenant mode only). */
   tenantFieldName?: string
+  /**
+   * Snapshot of the tenant's display name (multi-tenant mode only).
+   * Best-effort: only set when the tenant field is populated.
+   */
+  tenantName?: string
 }
 
 /**
@@ -80,6 +85,7 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     req,
     tenant,
     tenantFieldName,
+    tenantName,
   } = args
 
   const { ipAddress, userAgent } = extractRequestMeta(req)
@@ -99,6 +105,10 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
   // Attach the tenant when multi-tenant mode is active and a tenant is known.
   if (tenantFieldName && tenant != null) {
     data[tenantFieldName] = tenant
+    data.tenantId = String(tenant)
+  }
+  if (tenantName != null) {
+    data.tenantName = tenantName
   }
 
   const payload = req.payload as unknown as LooseCreatePayload

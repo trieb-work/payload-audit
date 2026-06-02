@@ -111,6 +111,24 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
       relationTo: multiTenant.tenantsCollectionSlug as CollectionSlug,
     } as Field
     fields.push(tenantField)
+
+    // Denormalised tenant id — survives deletion of the tenant document.
+    const tenantIdField = {
+      name: 'tenantId',
+      type: 'text',
+      admin: { description: "Snapshot of the tenant's id at the time of the action." },
+      index: true,
+      label: 'Tenant ID',
+    } as Field
+    fields.push(tenantIdField)
+
+    const tenantNameField = {
+      name: 'tenantName',
+      type: 'text',
+      admin: { description: "Snapshot of the tenant's name at the time of the action." },
+      label: 'Tenant name',
+    } as Field
+    fields.push(tenantNameField)
   }
 
   fields.push(
