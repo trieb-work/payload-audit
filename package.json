@@ -20,8 +20,6 @@
     "pci-dss",
     "nis2",
     "cra",
-    "mongodb",
-    "mongoose",
     "nextjs",
     "react",
     "typescript"
