@@ -63,6 +63,16 @@ export const auditLogPlugin =
       .filter((collection) => Boolean(collection.auth))
       .map((collection) => collection.slug)
 
+    // Resolve multi-tenant settings (disabled unless explicitly enabled).
+    const mt = pluginConfig.multiTenant
+    const multiTenant =
+      mt?.enabled ?
+        {
+          tenantFieldName: mt.tenantFieldName ?? 'tenant',
+          tenantsCollectionSlug: mt.tenantsCollectionSlug ?? 'tenants',
+        }
+      : undefined
+
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {
         continue
@@ -76,6 +86,7 @@ export const auditLogPlugin =
         authCollectionSlugs,
         collectionSlug: collection.slug,
         isUpload: Boolean(collection.upload),
+        tenantFieldName: multiTenant?.tenantFieldName,
         useAsTitle,
       }
 
@@ -96,6 +107,7 @@ export const auditLogPlugin =
         slug: auditCollectionSlug,
         access: pluginConfig.access,
         authCollectionSlugs,
+        multiTenant,
       }),
     ]
 

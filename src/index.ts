@@ -20,6 +20,7 @@ export {
   type AuditAction,
   type AuditHookOptions,
   type AuditLogPluginConfig,
+  type AuditMultiTenantConfig,
   type AuditRequestContext,
   type AuditRetentionConfig,
   DEFAULT_AUDIT_COLLECTION_SLUG,
@@ -27,6 +28,7 @@ export {
 } from './types'
 
 export { extractRequestMeta } from './utils/extractRequestMeta'
+export { extractTenant } from './utils/extractTenant'
 export { resolveDocTitle } from './utils/resolveDocTitle'
 export { writeAuditLog } from './utils/writeAuditLog'
 export type { WriteAuditLogArgs } from './utils/writeAuditLog'
