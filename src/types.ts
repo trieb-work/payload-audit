@@ -17,14 +17,26 @@ export type AuditAction = 'create' | 'delete' | 'file_delete' | 'file_upload' | 
 
 /**
  * Retention policy for audit log entries. Both limits may be set at once; a
- * prune run removes any entry that violates either rule. Enforced by the
- * scheduled task added in Phase 3.
+ * prune run removes any entry that violates either rule (age first, then count).
+ * Enforced by a Payload scheduled task registered when a limit is configured.
  */
 export interface AuditRetentionConfig {
+  /**
+   * Cron expression for the prune task's schedule.
+   * Default: `0 0 * * *` (daily at midnight).
+   */
+  cron?: string
+  /**
+   * Register the prune task but without a schedule, so it only runs when
+   * triggered manually (e.g. via `payload.jobs.queue`). Default: `false`.
+   */
+  disableSchedule?: boolean
   /** Delete entries older than this many days. Disabled when undefined. */
   maxAge?: number
   /** Keep at most this many entries; oldest beyond the limit are removed. */
   maxEntries?: number
+  /** Queue the prune task is scheduled on. Default: `default`. */
+  queue?: string
 }
 
 /**
