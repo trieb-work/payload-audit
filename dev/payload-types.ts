@@ -68,6 +68,7 @@ export interface Config {
   blocks: {};
   collections: {
     users: User;
+    tenants: Tenant;
     posts: Post;
     pages: Page;
     media: Media;
@@ -81,6 +82,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
+    tenants: TenantsSelect<false> | TenantsSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -162,12 +164,23 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants".
+ */
+export interface Tenant {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts".
  */
 export interface Post {
   id: string;
   title: string;
   content?: string | null;
+  tenant?: (string | null) | Tenant;
   updatedAt: string;
   createdAt: string;
 }
@@ -219,6 +232,10 @@ export interface AuditLog {
    * The authenticated user who performed the action, if any.
    */
   actor?: (string | null) | User;
+  /**
+   * Tenant the audited document belongs to.
+   */
+  tenant?: (string | null) | Tenant;
   /**
    * Client IP address, when available.
    */
@@ -360,6 +377,10 @@ export interface PayloadLockedDocument {
         value: string | User;
       } | null)
     | ({
+        relationTo: 'tenants';
+        value: string | Tenant;
+      } | null)
+    | ({
         relationTo: 'posts';
         value: string | Post;
       } | null)
@@ -441,11 +462,21 @@ export interface UsersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants_select".
+ */
+export interface TenantsSelect<T extends boolean = true> {
+  name?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts_select".
  */
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
   content?: T;
+  tenant?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -486,6 +517,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   docId?: T;
   docTitle?: T;
   actor?: T;
+  tenant?: T;
   ipAddress?: T;
   userAgent?: T;
   updatedAt?: T;
