@@ -233,9 +233,25 @@ export interface AuditLog {
    */
   actor?: (string | null) | User;
   /**
+   * Snapshot of the actor's email at the time of the action.
+   */
+  actorEmail?: string | null;
+  /**
+   * Snapshot of the actor's display name at the time of the action.
+   */
+  actorName?: string | null;
+  /**
    * Tenant the audited document belongs to.
    */
   tenant?: (string | null) | Tenant;
+  /**
+   * Snapshot of the tenant's id at the time of the action.
+   */
+  tenantId?: string | null;
+  /**
+   * Snapshot of the tenant's name at the time of the action.
+   */
+  tenantName?: string | null;
   /**
    * Client IP address, when available.
    */
@@ -517,7 +533,11 @@ export interface AuditLogsSelect<T extends boolean = true> {
   docId?: T;
   docTitle?: T;
   actor?: T;
+  actorEmail?: T;
+  actorName?: T;
   tenant?: T;
+  tenantId?: T;
+  tenantName?: T;
   ipAddress?: T;
   userAgent?: T;
   updatedAt?: T;
