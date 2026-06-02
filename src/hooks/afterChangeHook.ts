@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook } from 'payload'
 
 import type { AuditAction, AuditHookOptions, AuditRequestContext } from '../types'
 
+import { extractTenant } from '../utils/extractTenant'
 import { resolveDocTitle } from '../utils/resolveDocTitle'
 import { writeAuditLog } from '../utils/writeAuditLog'
 
@@ -17,7 +18,14 @@ import { writeAuditLog } from '../utils/writeAuditLog'
  * single operation out (e.g. when a consumer records a more specific entry).
  */
 export function createAuditAfterChangeHook(options: AuditHookOptions): CollectionAfterChangeHook {
-  const { auditCollectionSlug, authCollectionSlugs, collectionSlug, isUpload, useAsTitle } = options
+  const {
+    auditCollectionSlug,
+    authCollectionSlugs,
+    collectionSlug,
+    isUpload,
+    tenantFieldName,
+    useAsTitle,
+  } = options
 
   return async ({ context, doc, operation, req }) => {
     if ((context as AuditRequestContext)?.skipAuditLog === true) {
@@ -39,6 +47,8 @@ export function createAuditAfterChangeHook(options: AuditHookOptions): Collectio
         docId: String(doc.id),
         docTitle: resolveDocTitle(doc, doc.id, useAsTitle),
         req,
+        tenant: tenantFieldName ? extractTenant(doc, tenantFieldName) : undefined,
+        tenantFieldName,
       })
     } catch (error) {
       req.payload.logger.error(
