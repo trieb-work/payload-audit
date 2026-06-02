@@ -22,9 +22,12 @@ const buildConfigWithMemoryDB = async () => {
   // is provided. This keeps the dev/test experience zero-config.
   const hasExternalDb = Boolean(process.env.DATABASE_URL || process.env.MONGODB_URI)
   if (!hasExternalDb) {
+    // A single-node replica set still supports the multi-document
+    // transactions Payload relies on, and starts faster / more reliably than a
+    // 3-node set for local dev and tests.
     const memoryDB = await MongoMemoryReplSet.create({
       replSet: {
-        count: 3,
+        count: 1,
         dbName: 'payloadmemory',
       },
     })
@@ -48,6 +51,12 @@ const buildConfigWithMemoryDB = async () => {
       },
     },
     collections: [
+      {
+        slug: 'users',
+        admin: { useAsTitle: 'email' },
+        auth: true,
+        fields: [],
+      },
       {
         slug: 'posts',
         admin: { useAsTitle: 'title' },
