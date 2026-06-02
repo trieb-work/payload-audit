@@ -56,3 +56,6 @@ src/**/*.d.ts
 # Prettier / ESLint caches
 .prettiercache
 .eslintcache
+
+
+next-env.d.ts
