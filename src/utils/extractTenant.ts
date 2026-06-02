@@ -28,3 +28,28 @@ export function extractTenant(
 
   return undefined
 }
+
+/**
+ * Reads the tenant display name from an audited document when the tenant field
+ * is a populated relationship object. Best-effort: returns `undefined` when
+ * the field is absent, unpopulated, or has no `name` property.
+ */
+export function extractTenantName(
+  doc: null | Record<string, unknown> | undefined,
+  tenantFieldName: string,
+): string | undefined {
+  if (!doc) {
+    return undefined
+  }
+
+  const value = doc[tenantFieldName]
+
+  if (value && typeof value === 'object') {
+    const name = (value as { name?: unknown }).name
+    if (typeof name === 'string' && name.trim().length > 0) {
+      return name
+    }
+  }
+
+  return undefined
+}

@@ -2,7 +2,7 @@ import type { CollectionAfterDeleteHook } from 'payload'
 
 import type { AuditAction, AuditHookOptions, AuditRequestContext } from '../types'
 
-import { extractTenant } from '../utils/extractTenant'
+import { extractTenant, extractTenantName } from '../utils/extractTenant'
 import { resolveDocTitle } from '../utils/resolveDocTitle'
 import { writeAuditLog } from '../utils/writeAuditLog'
 
@@ -46,6 +46,10 @@ export function createAuditAfterDeleteHook(options: AuditHookOptions): Collectio
             extractTenant(doc as Record<string, unknown>, tenantFieldName)
           : undefined,
         tenantFieldName,
+        tenantName:
+          tenantFieldName ?
+            extractTenantName(doc as Record<string, unknown>, tenantFieldName)
+          : undefined,
       })
     } catch (error) {
       req.payload.logger.error(
