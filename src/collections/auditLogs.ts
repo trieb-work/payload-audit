@@ -100,13 +100,13 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
     {
       name: 'actorEmail',
       type: 'text',
-      admin: { description: 'Snapshot of the actor\'s email at the time of the action.' },
+      admin: { description: "Snapshot of the actor's email at the time of the action." },
       label: 'Actor email',
     },
     {
       name: 'actorName',
       type: 'text',
-      admin: { description: 'Snapshot of the actor\'s display name at the time of the action.' },
+      admin: { description: "Snapshot of the actor's display name at the time of the action." },
       label: 'Actor name',
     },
   )

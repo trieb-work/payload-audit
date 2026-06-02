@@ -72,13 +72,11 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
   const { ipAddress, userAgent } = extractRequestMeta(req)
   const actor = resolveActor(req, authCollectionSlugs)
 
-  const user = req.user as
-    | {
-        email?: string
-        id?: number | string
-        name?: string
-      }
-    | null
+  const user = req.user as {
+    email?: string
+    id?: number | string
+    name?: string
+  } | null
 
   const payload = req.payload as unknown as LooseCreatePayload
 
