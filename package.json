@@ -1,6 +1,6 @@
 {
   "name": "@trieb.work/payload-audit",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Payload CMS plugin for automatic, compliance-ready audit logging across all collections",
   "keywords": [
     "payload",
