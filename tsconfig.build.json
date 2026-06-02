@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "incremental": false,
+    "composite": false,
+    "paths": {
+      "@trieb.work/payload-audit": ["./src/index.ts"]
+    }
+  },
+  "include": ["./src/**/*.ts", "./src/**/*.tsx", "./src/**/*.d.ts"],
+  "exclude": ["dist", "node_modules", "tests", "dev"]
+}
