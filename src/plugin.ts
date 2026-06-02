@@ -77,9 +77,7 @@ export const auditLogPlugin =
         }
         const hasTenantField = collection.fields?.some(
           (field) =>
-            'name' in field &&
-            typeof field.name === 'string' &&
-            field.name === tenantFieldName,
+            'name' in field && typeof field.name === 'string' && field.name === tenantFieldName,
         )
         if (hasTenantField) {
           multiTenantEnabled = true
@@ -88,12 +86,13 @@ export const auditLogPlugin =
       }
     }
 
-    const multiTenant = multiTenantEnabled ?
-      {
-        tenantFieldName,
-        tenantsCollectionSlug,
-      }
-    : undefined
+    const multiTenant =
+      multiTenantEnabled ?
+        {
+          tenantFieldName,
+          tenantsCollectionSlug,
+        }
+      : undefined
 
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {
