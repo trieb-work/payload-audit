@@ -50,6 +50,28 @@ export interface AuditAccessConfig {
 }
 
 /**
+ * Optional multi-tenant support. When enabled, the audit log collection gains a
+ * `tenant` relationship and each entry records the tenant of the audited
+ * document, so logs can be scoped per tenant.
+ *
+ * This is designed to interoperate with `@payloadcms/plugin-multi-tenant`: that
+ * plugin adds the tenant field (default name `tenant`) to your collections, and
+ * this plugin reads it. To enforce tenant-scoped read access in the admin UI,
+ * also register the audit collection with the multi-tenant plugin.
+ */
+export interface AuditMultiTenantConfig {
+  /** Turn multi-tenant support on. Default: `false`. */
+  enabled?: boolean
+  /**
+   * Name of the tenant field on audited documents and on the audit collection.
+   * Default: `tenant`.
+   */
+  tenantFieldName?: string
+  /** Slug of the tenants collection for the relationship. Default: `tenants`. */
+  tenantsCollectionSlug?: string
+}
+
+/**
  * Configuration accepted by {@link auditLogPlugin}.
  */
 export interface AuditLogPluginConfig {
@@ -67,6 +89,8 @@ export interface AuditLogPluginConfig {
   disabledCollections?: string[]
   /** Master switch. When `false`, the plugin is a no-op. Default: `true`. */
   enabled?: boolean
+  /** Optional multi-tenant support. Disabled unless `enabled` is `true`. */
+  multiTenant?: AuditMultiTenantConfig
   /** Retention policy. When omitted, entries are kept indefinitely. */
   retention?: AuditRetentionConfig
 }
@@ -81,6 +105,11 @@ export interface AuditHookOptions {
   collectionSlug: string
   /** Whether the audited collection is upload-enabled (stores files). */
   isUpload: boolean
+  /**
+   * When multi-tenant support is on, the tenant field name to read from the
+   * audited document and write onto the audit entry. Undefined disables it.
+   */
+  tenantFieldName?: string
   /** The audited collection's `admin.useAsTitle` field, if any. */
   useAsTitle?: string
 }
