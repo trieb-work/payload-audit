@@ -176,7 +176,11 @@ export function createPruneAuditLogsTask(
         req,
       })
       req.payload.logger.info(
-        { deleted: result.deleted, deletedByAge: result.deletedByAge, deletedByCount: result.deletedByCount },
+        {
+          deleted: result.deleted,
+          deletedByAge: result.deletedByAge,
+          deletedByCount: result.deletedByCount,
+        },
         '[payload-audit] Pruned audit logs',
       )
       return { output: result }

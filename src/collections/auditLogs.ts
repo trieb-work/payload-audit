@@ -13,6 +13,11 @@ export interface BuildAuditLogsCollectionArgs {
   access?: AuditAccessConfig
   /** Auth-enabled collection slugs, used to shape the `actor` relationship. */
   authCollectionSlugs: string[]
+  /** When set, adds a tenant relationship field for multi-tenant scoping. */
+  multiTenant?: {
+    tenantFieldName: string
+    tenantsCollectionSlug: string
+  }
   /** Slug for the generated collection. */
   slug: string
 }
@@ -26,7 +31,7 @@ export interface BuildAuditLogsCollectionArgs {
  * any authenticated user and can be tightened via the plugin's `access.read`.
  */
 export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): CollectionConfig {
-  const { slug, access, authCollectionSlugs } = args
+  const { slug, access, authCollectionSlugs, multiTenant } = args
 
   const fields: Field[] = [
     {
@@ -110,6 +115,37 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
       label: 'Actor name',
     },
   )
+
+  // Multi-tenant: add the tenant relationship so entries can be scoped per
+  // tenant (and so the multi-tenant plugin can constrain access if registered).
+  if (multiTenant) {
+    const tenantField = {
+      name: multiTenant.tenantFieldName,
+      type: 'relationship',
+      admin: { description: 'Tenant the audited document belongs to.' },
+      index: true,
+      relationTo: multiTenant.tenantsCollectionSlug as CollectionSlug,
+    } as Field
+    fields.push(tenantField)
+
+    // Denormalised tenant snapshot — survives deletion of the tenant document.
+    const tenantIdField = {
+      name: 'tenantId',
+      type: 'text',
+      admin: { description: "Snapshot of the tenant's id at the time of the action." },
+      index: true,
+      label: 'Tenant ID',
+    } as Field
+    fields.push(tenantIdField)
+
+    const tenantNameField = {
+      name: 'tenantName',
+      type: 'text',
+      admin: { description: "Snapshot of the tenant's name at the time of the action." },
+      label: 'Tenant name',
+    } as Field
+    fields.push(tenantNameField)
+  }
 
   fields.push(
     {

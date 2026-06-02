@@ -58,11 +58,19 @@ const buildConfigWithMemoryDB = async () => {
         fields: [],
       },
       {
+        slug: 'tenants',
+        admin: { useAsTitle: 'name' },
+        fields: [{ name: 'name', type: 'text', required: true }],
+      },
+      {
         slug: 'posts',
         admin: { useAsTitle: 'title' },
         fields: [
           { name: 'title', type: 'text', required: true },
           { name: 'content', type: 'textarea' },
+          // Tenant field (as the multi-tenant plugin would add). Exercises the
+          // plugin's multiTenant capture.
+          { name: 'tenant', type: 'relationship', relationTo: 'tenants' },
         ],
       },
       {
@@ -96,6 +104,11 @@ const buildConfigWithMemoryDB = async () => {
         retention: {
           maxAge: 90,
           maxEntries: 500,
+        },
+        // Exercise multi-tenant capture: audit entries record the audited
+        // document's tenant.
+        multiTenant: {
+          enabled: true,
         },
       }),
     ],

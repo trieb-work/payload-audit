@@ -50,6 +50,44 @@ export interface AuditAccessConfig {
 }
 
 /**
+ * Optional multi-tenant support. When enabled, the audit log collection gains a
+ * `tenant` relationship and each entry records the tenant of the audited
+ * document, so logs can be scoped per tenant.
+ *
+ * Designed to interoperate with `@payloadcms/plugin-multi-tenant`:
+ *
+ * | Multi-tenant plugin option | Audit plugin option        |
+ * |----------------------------|----------------------------|
+ * | `tenantField.name`         | `tenantFieldName`          |
+ * | `tenantsSlug`              | `tenantsCollectionSlug`    |
+ *
+ * To enforce tenant-scoped read access in the admin UI, also register the audit
+ * collection with the multi-tenant plugin's `collections` option.
+ */
+export interface AuditMultiTenantConfig {
+  /**
+   * When `true`, the plugin scans the host app's collections for a field named
+   * `tenantFieldName` and automatically enables multi-tenant mode if at least
+   * one audited collection has it. (`@payloadcms/plugin-multi-tenant` adds the tenant field).
+   */
+  autoDetect?: boolean
+  /** Turn multi-tenant support on. Default: `false`. */
+  enabled?: boolean
+  /**
+   * Name of the tenant field on audited documents and on the audit collection.
+   * Maps to `tenantField.name` in `@payloadcms/plugin-multi-tenant`.
+   * Default: `tenant`.
+   */
+  tenantFieldName?: string
+  /**
+   * Slug of the tenants collection for the relationship.
+   * Maps to `tenantsSlug` in `@payloadcms/plugin-multi-tenant`.
+   * Default: `tenants`.
+   */
+  tenantsCollectionSlug?: string
+}
+
+/**
  * Configuration accepted by {@link auditLogPlugin}.
  */
 export interface AuditLogPluginConfig {
@@ -67,6 +105,8 @@ export interface AuditLogPluginConfig {
   disabledCollections?: string[]
   /** Master switch. When `false`, the plugin is a no-op. Default: `true`. */
   enabled?: boolean
+  /** Optional multi-tenant support. Disabled unless `enabled` is `true`. */
+  multiTenant?: AuditMultiTenantConfig
   /** Retention policy. When omitted, entries are kept indefinitely. */
   retention?: AuditRetentionConfig
 }
@@ -81,6 +121,16 @@ export interface AuditHookOptions {
   collectionSlug: string
   /** Whether the audited collection is upload-enabled (stores files). */
   isUpload: boolean
+  /**
+   * When multi-tenant support is on, the tenant field name to read from the
+   * audited document and write onto the audit entry. Undefined disables it.
+   */
+  tenantFieldName?: string
+  /**
+   * Snapshot of the tenant's display name, extracted when the tenant field is
+   * populated (best-effort). Survives deletion of the tenant document.
+   */
+  tenantName?: string
   /** The audited collection's `admin.useAsTitle` field, if any. */
   useAsTitle?: string
 }

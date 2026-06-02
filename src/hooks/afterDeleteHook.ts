@@ -2,6 +2,7 @@ import type { CollectionAfterDeleteHook } from 'payload'
 
 import type { AuditAction, AuditHookOptions, AuditRequestContext } from '../types'
 
+import { extractTenant, extractTenantName } from '../utils/extractTenant'
 import { resolveDocTitle } from '../utils/resolveDocTitle'
 import { writeAuditLog } from '../utils/writeAuditLog'
 
@@ -15,7 +16,14 @@ import { writeAuditLog } from '../utils/writeAuditLog'
  * opts a single operation out.
  */
 export function createAuditAfterDeleteHook(options: AuditHookOptions): CollectionAfterDeleteHook {
-  const { auditCollectionSlug, authCollectionSlugs, collectionSlug, isUpload, useAsTitle } = options
+  const {
+    auditCollectionSlug,
+    authCollectionSlugs,
+    collectionSlug,
+    isUpload,
+    tenantFieldName,
+    useAsTitle,
+  } = options
 
   return async ({ id, context, doc, req }) => {
     if ((context as AuditRequestContext)?.skipAuditLog === true) {
@@ -33,6 +41,15 @@ export function createAuditAfterDeleteHook(options: AuditHookOptions): Collectio
         docId: String(id),
         docTitle: resolveDocTitle(doc as Record<string, unknown>, id, useAsTitle),
         req,
+        tenant:
+          tenantFieldName ?
+            extractTenant(doc as Record<string, unknown>, tenantFieldName)
+          : undefined,
+        tenantFieldName,
+        tenantName:
+          tenantFieldName ?
+            extractTenantName(doc as Record<string, unknown>, tenantFieldName)
+          : undefined,
       })
     } catch (error) {
       req.payload.logger.error(
