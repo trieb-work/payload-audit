@@ -31,6 +31,10 @@ export interface WriteAuditLogArgs {
   docTitle?: string
   /** The originating request (provides actor, IP, user agent, transaction). */
   req: PayloadRequest
+  /** Tenant id of the audited document (multi-tenant mode only). */
+  tenant?: number | string
+  /** Field name under which to store the tenant (multi-tenant mode only). */
+  tenantFieldName?: string
 }
 
 /**
@@ -66,26 +70,42 @@ function resolveActor(
  * it, keeping the trail consistent with the audited change.
  */
 export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
-  const { action, auditCollectionSlug, authCollectionSlugs, collection, docId, docTitle, req } =
-    args
+  const {
+    action,
+    auditCollectionSlug,
+    authCollectionSlugs,
+    collection,
+    docId,
+    docTitle,
+    req,
+    tenant,
+    tenantFieldName,
+  } = args
 
   const { ipAddress, userAgent } = extractRequestMeta(req)
   const actor = resolveActor(req, authCollectionSlugs)
+
+  const data: Record<string, unknown> = {
+    action,
+    actor: actor ?? undefined,
+    docId,
+    docTitle,
+    entityCollection: collection,
+    ipAddress,
+    occurredAt: new Date().toISOString(),
+    userAgent,
+  }
+
+  // Attach the tenant when multi-tenant mode is active and a tenant is known.
+  if (tenantFieldName && tenant != null) {
+    data[tenantFieldName] = tenant
+  }
 
   const payload = req.payload as unknown as LooseCreatePayload
 
   await payload.create({
     collection: auditCollectionSlug,
-    data: {
-      action,
-      actor: actor ?? undefined,
-      docId,
-      docTitle,
-      entityCollection: collection,
-      ipAddress,
-      occurredAt: new Date().toISOString(),
-      userAgent,
-    },
+    data,
     overrideAccess: true,
     req,
   })
