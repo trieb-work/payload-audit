@@ -95,6 +95,22 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
     fields.push(actorField)
   }
 
+  // Denormalised actor snapshot — survives deletion of the user document.
+  fields.push(
+    {
+      name: 'actorEmail',
+      type: 'text',
+      admin: { description: 'Snapshot of the actor\'s email at the time of the action.' },
+      label: 'Actor email',
+    },
+    {
+      name: 'actorName',
+      type: 'text',
+      admin: { description: 'Snapshot of the actor\'s display name at the time of the action.' },
+      label: 'Actor name',
+    },
+  )
+
   fields.push(
     {
       name: 'ipAddress',
