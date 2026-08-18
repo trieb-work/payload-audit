@@ -137,6 +137,14 @@ function resolveTokenFingerprint(headers: Headers | undefined): string | undefin
   }
 
   try {
+    // SHA-256 is the correct choice here — this is token fingerprinting, not
+    // password hashing. Auth tokens are high-entropy (cryptographically random
+    // JWTs / API keys), so brute-forcing the hash to recover the token is
+    // computationally infeasible, unlike low-entropy human passwords. A slow
+    // KDF (bcrypt/scrypt/argon2) would be wrong: it uses a random salt (which
+    // would break correlation — the whole point of the fingerprint) and is
+    // intentionally slow (unacceptable on the audit-logging hot path). This
+    // mirrors how GitHub (`ghp_`) and Stripe (`sk_`) fingerprint issued tokens.
     const hash = createHash('sha256').update(token).digest('hex')
     return `${token.slice(0, 8)}:${hash}`
   } catch {
