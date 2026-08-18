@@ -1,6 +1,6 @@
 import type { AuditAction, PayloadRequest } from '../types'
 
-import { extractRequestMeta } from './extractRequestMeta'
+import { type ExtractForensicsOptions, extractRequestMeta } from './extractRequestMeta'
 
 /**
  * Loosely-typed view of `payload.create`. The plugin is generic and must not
@@ -29,6 +29,11 @@ export interface WriteAuditLogArgs {
   docId: string
   /** Human-readable label for the audited document, if resolvable. */
   docTitle?: string
+  /**
+   * Forensic capture flags. When a flag is `false` the corresponding metadata
+   * is neither extracted nor written. Omit entirely to capture only IP + UA.
+   */
+  forensics?: ExtractForensicsOptions
   /** The originating request (provides actor, IP, user agent, transaction). */
   req: PayloadRequest
   /** Tenant id of the audited document (multi-tenant mode only). */
@@ -82,13 +87,15 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     collection,
     docId,
     docTitle,
+    forensics,
     req,
     tenant,
     tenantFieldName,
     tenantName,
   } = args
 
-  const { ipAddress, userAgent } = extractRequestMeta(req)
+  const { authStrategy, ipAddress, requestMethod, requestPath, tokenFingerprint, userAgent } =
+    extractRequestMeta(req, forensics)
   const actor = resolveActor(req, authCollectionSlugs)
 
   const user = req.user as {
@@ -108,6 +115,21 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     ipAddress,
     occurredAt: new Date().toISOString(),
     userAgent,
+  }
+
+  // Forensic metadata — only set when the operator has enabled capture, so
+  // disabled fields stay absent rather than being written as `undefined`.
+  if (forensics?.authStrategy && authStrategy) {
+    data.authStrategy = authStrategy
+  }
+  if (forensics?.requestMethod && requestMethod) {
+    data.requestMethod = requestMethod
+  }
+  if (forensics?.requestPath && requestPath) {
+    data.requestPath = requestPath
+  }
+  if (forensics?.tokenFingerprint && tokenFingerprint) {
+    data.tokenFingerprint = tokenFingerprint
   }
 
   // Attach the tenant when multi-tenant mode is active and a tenant is known.

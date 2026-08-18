@@ -94,6 +94,17 @@ export const auditLogPlugin =
         }
       : undefined
 
+    // Resolve forensic capture flags. `authStrategy` and `requestMethod`
+    // default to `true` (safe, no sensitive data); `requestPath` and
+    // `tokenFingerprint` default to `false` (opt-in due to sensitivity).
+    const f = pluginConfig.forensics
+    const forensics = {
+      authStrategy: f?.authStrategy ?? true,
+      requestMethod: f?.requestMethod ?? true,
+      requestPath: f?.requestPath ?? false,
+      tokenFingerprint: f?.tokenFingerprint ?? false,
+    }
+
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {
         continue
@@ -106,6 +117,7 @@ export const auditLogPlugin =
         auditCollectionSlug,
         authCollectionSlugs,
         collectionSlug: collection.slug,
+        forensics,
         isUpload: Boolean(collection.upload),
         tenantFieldName: multiTenant?.tenantFieldName,
         useAsTitle,
@@ -128,6 +140,7 @@ export const auditLogPlugin =
         slug: auditCollectionSlug,
         access: pluginConfig.access,
         authCollectionSlugs,
+        forensics,
         multiTenant,
       }),
     ]

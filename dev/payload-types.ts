@@ -260,6 +260,22 @@ export interface AuditLog {
    * Client user agent, when available.
    */
   userAgent?: string | null;
+  /**
+   * Auth strategy that authenticated the request (e.g. local-jwt, local-api-key, cookie).
+   */
+  authStrategy?: string | null;
+  /**
+   * HTTP method of the originating request.
+   */
+  requestMethod?: string | null;
+  /**
+   * Request URL path (query string stripped).
+   */
+  requestPath?: string | null;
+  /**
+   * Non-reversible fingerprint of the auth token: <prefix8>:<sha256(token)>. Used to correlate actions performed with the same token without storing the token itself.
+   */
+  tokenFingerprint?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -540,6 +556,10 @@ export interface AuditLogsSelect<T extends boolean = true> {
   tenantName?: T;
   ipAddress?: T;
   userAgent?: T;
+  authStrategy?: T;
+  requestMethod?: T;
+  requestPath?: T;
+  tokenFingerprint?: T;
   updatedAt?: T;
   createdAt?: T;
 }

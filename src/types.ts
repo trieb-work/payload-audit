@@ -88,6 +88,56 @@ export interface AuditMultiTenantConfig {
 }
 
 /**
+ * Forensic metadata captured alongside each audit entry to aid breach
+ * investigation. All fields are opt-in so existing installations do not gain
+ * new collection fields or captured data without explicit configuration.
+ *
+ * The token fingerprint is designed for the exact scenario where a credential
+ * has been stolen: it lets you correlate every action performed with the same
+ * token (and see where it first appeared) without ever persisting the token
+ * itself. Only a non-reversible prefix + SHA-256 hash is stored.
+ */
+export interface AuditForensicsConfig {
+  /**
+   * Record which auth strategy authenticated the request
+   * (e.g. `local-jwt`, `local-api-key`, `cookie`, or a custom strategy name
+   * exposed via `req.user._strategy`). Default: `true`.
+   *
+   * Always safe — no sensitive data, just the strategy identifier.
+   */
+  authStrategy?: boolean
+  /**
+   * Record the HTTP method of the originating request (GET, POST, …).
+   * Default: `true`.
+   */
+  requestMethod?: boolean
+  /**
+   * Record the request URL path (without query string). Default: `false`.
+   *
+   * Warning: paths may contain sensitive data (document IDs, PII-derived
+   * slugs). Enable only when the forensic value outweighs the sensitivity.
+   * Query strings are always stripped.
+   */
+  requestPath?: boolean
+  /**
+   * Record a non-reversible fingerprint of the auth token used for the
+   * request, enabling correlation of all actions performed with the same
+   * token. Default: `false`.
+   *
+   * The fingerprint is `<prefix8>:<sha256(rest)>` — the first 8 characters of
+   * the token (so a user can recognise which of their tokens it was) followed
+   * by the SHA-256 hash of the full token. The raw token is never stored.
+   *
+   * Extracted from the `Authorization: Bearer <token>` header (JWT/session
+   * tokens) and the `Payload-API-Key` header (API keys). Cookie-based session
+   * auth does not expose a bearer token in a stable header, so no fingerprint
+   * is recorded for those requests (the `authStrategy` field still identifies
+   * them).
+   */
+  tokenFingerprint?: boolean
+}
+
+/**
  * Configuration accepted by {@link auditLogPlugin}.
  */
 export interface AuditLogPluginConfig {
@@ -105,6 +155,12 @@ export interface AuditLogPluginConfig {
   disabledCollections?: string[]
   /** Master switch. When `false`, the plugin is a no-op. Default: `true`. */
   enabled?: boolean
+  /**
+   * Forensic metadata to capture alongside each audit entry (auth strategy,
+   * token fingerprint, HTTP method, request path). All opt-in except
+   * `authStrategy` and `requestMethod`, which default to `true`.
+   */
+  forensics?: AuditForensicsConfig
   /** Optional multi-tenant support. Disabled unless `enabled` is `true`. */
   multiTenant?: AuditMultiTenantConfig
   /** Retention policy. When omitted, entries are kept indefinitely. */
@@ -119,6 +175,16 @@ export interface AuditHookOptions {
   authCollectionSlugs: string[]
   /** Slug of the collection being audited. */
   collectionSlug: string
+  /**
+   * Resolved forensic capture flags. When a flag is `false` the corresponding
+   * metadata is neither extracted nor written, keeping entries lean.
+   */
+  forensics?: {
+    authStrategy: boolean
+    requestMethod: boolean
+    requestPath: boolean
+    tokenFingerprint: boolean
+  }
   /** Whether the audited collection is upload-enabled (stores files). */
   isUpload: boolean
   /**
@@ -137,7 +203,18 @@ export interface AuditHookOptions {
 
 /** Request-derived metadata captured alongside each audit entry. */
 export interface RequestMeta {
+  /** Auth strategy that authenticated the request, e.g. `local-jwt`. */
+  authStrategy?: string
   ipAddress?: string
+  /** HTTP method of the originating request, e.g. `POST`. */
+  requestMethod?: string
+  /** Request URL path (query string stripped). */
+  requestPath?: string
+  /**
+   * Non-reversible fingerprint of the auth token: `<prefix8>:<sha256(token)>`.
+   * The raw token is never stored.
+   */
+  tokenFingerprint?: string
   userAgent?: string
 }
 

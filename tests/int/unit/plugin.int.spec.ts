@@ -100,4 +100,28 @@ describe('auditLogPlugin (config wiring)', () => {
     const withTenant = (findCollection(withMT, 'audit-logs')?.fields ?? []).map((f: any) => f.name)
     expect(withTenant).toContain('tenant')
   })
+
+  it('adds authStrategy and requestMethod by default, but not requestPath or tokenFingerprint', () => {
+    const fieldNames = (findCollection(apply(), 'audit-logs')?.fields ?? []).map((f: any) => f.name)
+    expect(fieldNames).toContain('authStrategy')
+    expect(fieldNames).toContain('requestMethod')
+    expect(fieldNames).not.toContain('requestPath')
+    expect(fieldNames).not.toContain('tokenFingerprint')
+  })
+
+  it('adds requestPath and tokenFingerprint only when explicitly enabled', () => {
+    const result = apply({
+      forensics: { requestPath: true, tokenFingerprint: true },
+    })
+    const fieldNames = (findCollection(result, 'audit-logs')?.fields ?? []).map((f: any) => f.name)
+    expect(fieldNames).toContain('requestPath')
+    expect(fieldNames).toContain('tokenFingerprint')
+  })
+
+  it('can disable authStrategy and requestMethod via forensics config', () => {
+    const result = apply({ forensics: { authStrategy: false, requestMethod: false } })
+    const fieldNames = (findCollection(result, 'audit-logs')?.fields ?? []).map((f: any) => f.name)
+    expect(fieldNames).not.toContain('authStrategy')
+    expect(fieldNames).not.toContain('requestMethod')
+  })
 })
