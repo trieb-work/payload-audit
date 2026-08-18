@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { createHash } from 'node:crypto'
 
-import { auditRowsContaining, createDoc, loginAsDevUser, loginViaApi, newestAuditEntry } from './helpers'
+import {
+  auditRowsContaining,
+  createDoc,
+  loginAsDevUser,
+  loginViaApi,
+  newestAuditEntry,
+} from './helpers'
 
 test.describe('audit logging (admin UI)', () => {
   test.beforeEach(async ({ page }) => {
@@ -117,8 +123,8 @@ test.describe('audit logging (forensics: token fingerprint)', () => {
     expect(res1.status()).toBe(201)
     expect(res2.status()).toBe(201)
 
-    const doc1 = String((await res1.json() as { doc: { id: number | string } }).doc.id)
-    const doc2 = String((await res2.json() as { doc: { id: number | string } }).doc.id)
+    const doc1 = String(((await res1.json()) as { doc: { id: number | string } }).doc.id)
+    const doc2 = String(((await res2.json()) as { doc: { id: number | string } }).doc.id)
 
     const entry1 = await newestAuditEntry(page, 'posts', doc1)
     const entry2 = await newestAuditEntry(page, 'posts', doc2)
@@ -148,8 +154,8 @@ test.describe('audit logging (forensics: token fingerprint)', () => {
     expect(res1.status()).toBe(201)
     expect(res2.status()).toBe(201)
 
-    const doc1 = String((await res1.json() as { doc: { id: number | string } }).doc.id)
-    const doc2 = String((await res2.json() as { doc: { id: number | string } }).doc.id)
+    const doc1 = String(((await res1.json()) as { doc: { id: number | string } }).doc.id)
+    const doc2 = String(((await res2.json()) as { doc: { id: number | string } }).doc.id)
 
     const entry1 = await newestAuditEntry(page, 'posts', doc1)
     const entry2 = await newestAuditEntry(page, 'posts', doc2)
