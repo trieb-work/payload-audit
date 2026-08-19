@@ -47,9 +47,7 @@ describe('resolveDelegation', () => {
       name: 'User',
       email: 'user@example.com',
     })
-    expect(result.chain).toEqual([
-      { id: 'admin-1', name: 'Admin', email: 'admin@example.com' },
-    ])
+    expect(result.chain).toEqual([{ id: 'admin-1', name: 'Admin', email: 'admin@example.com' }])
     expect(result.dropped).toBe(0)
   })
 

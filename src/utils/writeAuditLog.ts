@@ -117,14 +117,14 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     extractRequestMeta(req, forensics)
 
   const delegationEnabled = delegation?.enabled !== false
-  const resolvedDelegation = delegationEnabled ?
-    resolveDelegation(req, delegation, onBehalfOf)
-  : null
+  const resolvedDelegation =
+    delegationEnabled ? resolveDelegation(req, delegation, onBehalfOf) : null
 
   // Determine the actor relationship value and its denormalised snapshot.
   // When delegation is present, the actor is the delegator; otherwise it is
   // the direct request user.
-  const actorUser = resolvedDelegation?.actor ?? (req.user as AuditDelegationUser | null | undefined)
+  const actorUser =
+    resolvedDelegation?.actor ?? (req.user as AuditDelegationUser | null | undefined)
   const actor = actorUser ? resolveActorValue(actorUser, authCollectionSlugs) : null
 
   const user = req.user as {

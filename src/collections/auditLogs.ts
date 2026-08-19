@@ -53,10 +53,13 @@ export interface BuildAuditLogsCollectionArgs {
  * any authenticated user and can be tightened via the plugin's `access.read`.
  */
 export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): CollectionConfig {
-  const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } = args
+  const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } =
+    args
 
   const extraActionOptions = (extraActions ?? []).map((action) =>
-    typeof action === 'string' ? { label: action, value: action } : { label: action.label ?? action.value, value: action.value },
+    typeof action === 'string' ?
+      { label: action, value: action }
+    : { label: action.label ?? action.value, value: action.value },
   )
 
   const fields: Field[] = [
@@ -171,7 +174,9 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
       {
         name: 'onBehalfOfName',
         type: 'text',
-        admin: { description: "Snapshot of the delegated user's display name at the time of the action." },
+        admin: {
+          description: "Snapshot of the delegated user's display name at the time of the action.",
+        },
         label: 'On behalf of name',
       },
       {
@@ -187,8 +192,7 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
         name: 'delegationChainDropped',
         type: 'number',
         admin: {
-          description:
-            'Number of delegation levels truncated because they exceeded maxChainDepth.',
+          description: 'Number of delegation levels truncated because they exceeded maxChainDepth.',
         },
         defaultValue: 0,
         label: 'Delegation chain dropped',
