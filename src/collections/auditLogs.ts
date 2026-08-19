@@ -56,13 +56,7 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
   const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } =
     args
 
-  const builtInActionValues = new Set([
-    'create',
-    'delete',
-    'file_delete',
-    'file_upload',
-    'update',
-  ])
+  const builtInActionValues = new Set(['create', 'delete', 'file_delete', 'file_upload', 'update'])
   const seenActionValues = new Set(builtInActionValues)
   const extraActionOptions = (extraActions ?? [])
     .map((action) =>

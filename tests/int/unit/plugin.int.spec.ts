@@ -188,9 +188,7 @@ describe('auditLogPlugin (config wiring)', () => {
 
   it('COPILIT #5: does not include actor/onBehalfOf in defaultColumns when no auth collections exist', () => {
     const cfg: Config = {
-      collections: [
-        { slug: 'posts', admin: { useAsTitle: 'title' }, fields: [] },
-      ],
+      collections: [{ slug: 'posts', admin: { useAsTitle: 'title' }, fields: [] }],
     } as unknown as Config
     const result = apply({}, cfg)
     const auditCollection = findCollection(result, 'audit-logs')
