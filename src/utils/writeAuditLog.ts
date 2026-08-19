@@ -80,7 +80,14 @@ function resolveActorValue(
     return null
   }
 
-  if (authCollectionSlugs.length > 1 && user.collection) {
+  if (authCollectionSlugs.length === 0) {
+    return null
+  }
+
+  if (authCollectionSlugs.length > 1) {
+    if (!user.collection) {
+      return null
+    }
     return { relationTo: user.collection, value: user.id }
   }
 

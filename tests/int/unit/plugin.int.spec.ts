@@ -163,4 +163,39 @@ describe('auditLogPlugin (config wiring)', () => {
     expect(optionValues).toContain('impersonation.started')
     expect(optionValues).toContain('impersonation.ended')
   })
+
+  it('COPILIT #3: de-duplicates extraActions by value, including built-in collisions', () => {
+    const result = apply({
+      extraActions: [
+        'impersonation.started',
+        'impersonation.started',
+        { label: 'Custom Create', value: 'create' },
+        { label: 'Impersonation ended', value: 'impersonation.ended' },
+      ],
+    })
+    const auditCollection = findCollection(result, 'audit-logs')
+    const actionField = (auditCollection?.fields ?? []).find((f: any) => f.name === 'action') as
+      | { options?: Array<{ value?: string } | string> }
+      | undefined
+    const optionValues = (actionField?.options ?? []).map((o: any) =>
+      typeof o === 'string' ? o : o.value,
+    )
+    const startedCount = optionValues.filter((v: string) => v === 'impersonation.started').length
+    const createCount = optionValues.filter((v: string) => v === 'create').length
+    expect(startedCount).toBe(1)
+    expect(createCount).toBe(1)
+  })
+
+  it('COPILIT #5: does not include actor/onBehalfOf in defaultColumns when no auth collections exist', () => {
+    const cfg: Config = {
+      collections: [
+        { slug: 'posts', admin: { useAsTitle: 'title' }, fields: [] },
+      ],
+    } as unknown as Config
+    const result = apply({}, cfg)
+    const auditCollection = findCollection(result, 'audit-logs')
+    const defaultColumns = (auditCollection?.admin as any)?.defaultColumns ?? []
+    expect(defaultColumns).not.toContain('actor')
+    expect(defaultColumns).not.toContain('onBehalfOf')
+  })
 })

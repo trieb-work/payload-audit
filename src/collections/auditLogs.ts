@@ -56,11 +56,27 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
   const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } =
     args
 
-  const extraActionOptions = (extraActions ?? []).map((action) =>
-    typeof action === 'string' ?
-      { label: action, value: action }
-    : { label: action.label ?? action.value, value: action.value },
-  )
+  const builtInActionValues = new Set([
+    'create',
+    'delete',
+    'file_delete',
+    'file_upload',
+    'update',
+  ])
+  const seenActionValues = new Set(builtInActionValues)
+  const extraActionOptions = (extraActions ?? [])
+    .map((action) =>
+      typeof action === 'string' ?
+        { label: action, value: action }
+      : { label: action.label ?? action.value, value: action.value },
+    )
+    .filter((option) => {
+      if (seenActionValues.has(option.value)) {
+        return false
+      }
+      seenActionValues.add(option.value)
+      return true
+    })
 
   const fields: Field[] = [
     {
@@ -306,8 +322,8 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
         'action',
         'entityCollection',
         'docTitle',
-        'actor',
-        ...(delegation?.enabled !== false ? ['onBehalfOf'] : []),
+        ...(authCollectionSlugs.length > 0 ? ['actor'] : []),
+        ...(delegation?.enabled !== false && authCollectionSlugs.length > 0 ? ['onBehalfOf'] : []),
         ...(forensics?.authStrategy ? ['authStrategy'] : []),
         ...(forensics?.tokenFingerprint ? ['tokenFingerprint'] : []),
       ],
