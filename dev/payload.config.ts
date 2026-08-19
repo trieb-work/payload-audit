@@ -99,6 +99,11 @@ const buildConfigWithMemoryDB = async () => {
       auditLogPlugin({
         // `pages` is intentionally excluded to exercise the disabledCollections option.
         disabledCollections: ['pages'],
+        // Exercise custom action types for delegated/impersonation events.
+        extraActions: [
+          { label: 'Impersonation started', value: 'impersonation.started' },
+          { label: 'Impersonation ended', value: 'impersonation.ended' },
+        ],
         // Exercise forensic capture: auth strategy, token fingerprint, HTTP
         // method and request path are recorded alongside each entry.
         forensics: {

@@ -1,6 +1,6 @@
 import type { Access, CollectionConfig, CollectionSlug, Field } from 'payload'
 
-import type { AuditAccessConfig } from '../types'
+import type { AuditAccessConfig, AuditDelegationConfig, AuditExtraAction } from '../types'
 
 /** Default read access: any authenticated user may read the audit trail. */
 const defaultReadAccess: Access = ({ req }) => Boolean(req.user)
@@ -13,6 +13,17 @@ export interface BuildAuditLogsCollectionArgs {
   access?: AuditAccessConfig
   /** Auth-enabled collection slugs, used to shape the `actor` relationship. */
   authCollectionSlugs: string[]
+  /**
+   * Delegation configuration. When `enabled` is not `false`, the collection
+   * gains `onBehalfOf` and `delegationChain` fields to record RFC 8693-style
+   * delegation chains.
+   */
+  delegation?: AuditDelegationConfig
+  /**
+   * Custom action types beyond the built-in lifecycle events. Merged into the
+   * `action` select options.
+   */
+  extraActions?: Array<AuditExtraAction | string>
   /**
    * Forensic capture flags. When a flag is `true` the corresponding field is
    * added to the collection schema. All default to `false` so existing
@@ -42,7 +53,11 @@ export interface BuildAuditLogsCollectionArgs {
  * any authenticated user and can be tightened via the plugin's `access.read`.
  */
 export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): CollectionConfig {
-  const { slug, access, authCollectionSlugs, forensics, multiTenant } = args
+  const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } = args
+
+  const extraActionOptions = (extraActions ?? []).map((action) =>
+    typeof action === 'string' ? { label: action, value: action } : { label: action.label ?? action.value, value: action.value },
+  )
 
   const fields: Field[] = [
     {
@@ -66,6 +81,7 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
         { label: 'Delete', value: 'delete' },
         { label: 'File upload', value: 'file_upload' },
         { label: 'File delete', value: 'file_delete' },
+        ...extraActionOptions,
       ],
       required: true,
     },
@@ -126,6 +142,59 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
       label: 'Actor name',
     },
   )
+
+  // Delegation-aware fields — record the user on whose behalf the action was
+  // performed (RFC 8693 `act` semantics) and, when available, the full chain
+  // of nested delegations.
+  if (delegation?.enabled !== false) {
+    if (authCollectionSlugs.length > 0) {
+      const onBehalfOfField = {
+        name: 'onBehalfOf',
+        type: 'relationship',
+        admin: { description: 'The user on whose behalf the action was performed, if any.' },
+        index: true,
+        relationTo:
+          authCollectionSlugs.length === 1 ?
+            (authCollectionSlugs[0] as CollectionSlug)
+          : (authCollectionSlugs as CollectionSlug[]),
+      } as Field
+      fields.push(onBehalfOfField)
+    }
+
+    fields.push(
+      {
+        name: 'onBehalfOfEmail',
+        type: 'text',
+        admin: { description: "Snapshot of the delegated user's email at the time of the action." },
+        label: 'On behalf of email',
+      },
+      {
+        name: 'onBehalfOfName',
+        type: 'text',
+        admin: { description: "Snapshot of the delegated user's display name at the time of the action." },
+        label: 'On behalf of name',
+      },
+      {
+        name: 'delegationChain',
+        type: 'json',
+        admin: {
+          description:
+            'Serialised RFC 8693-style delegation chain (innermost actor first). Empty when no delegation occurred.',
+        },
+        label: 'Delegation chain',
+      },
+      {
+        name: 'delegationChainDropped',
+        type: 'number',
+        admin: {
+          description:
+            'Number of delegation levels truncated because they exceeded maxChainDepth.',
+        },
+        defaultValue: 0,
+        label: 'Delegation chain dropped',
+      },
+    )
+  }
 
   // Multi-tenant: add the tenant relationship so entries can be scoped per
   // tenant (and so the multi-tenant plugin can constrain access if registered).
@@ -234,6 +303,7 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
         'entityCollection',
         'docTitle',
         'actor',
+        ...(delegation?.enabled !== false ? ['onBehalfOf'] : []),
         ...(forensics?.authStrategy ? ['authStrategy'] : []),
         ...(forensics?.tokenFingerprint ? ['tokenFingerprint'] : []),
       ],
