@@ -57,23 +57,13 @@ export function resolveDelegation(
   }
 
   const user = req.user as AuditDelegationUser | null | undefined
-  const delegator = user?._delegatedBy
-
-  // No delegation info at all: actor stays null so the caller uses the
-  // direct request user.
-  if (!delegator && !onBehalfOfOverride) {
-    return { actor: null, chain: [], dropped: 0, onBehalfOf: null }
+  if (!user) {
+    return { actor: null, chain: [], dropped: 0, onBehalfOf: onBehalfOfOverride ?? null }
   }
 
-  // Only an explicit override without a delegator: record the override but
-  // leave actor resolution to the caller (the direct request user).
+  const delegator = user._delegatedBy
   if (!delegator) {
-    return {
-      actor: null,
-      chain: [],
-      dropped: 0,
-      onBehalfOf: onBehalfOfOverride ?? null,
-    }
+    return { actor: null, chain: [], dropped: 0, onBehalfOf: onBehalfOfOverride ?? null }
   }
 
   const maxDepth = delegation?.maxChainDepth ?? DEFAULT_MAX_CHAIN_DEPTH
@@ -83,8 +73,7 @@ export function resolveDelegation(
     actor: delegator,
     chain,
     dropped,
-    // Override takes precedence; otherwise the request user is the subject.
-    onBehalfOf: onBehalfOfOverride ?? user ?? null,
+    onBehalfOf: onBehalfOfOverride ?? user,
   }
 }
 
