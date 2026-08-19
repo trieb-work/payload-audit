@@ -1,5 +1,83 @@
 # @trieb.work/payload-audit
 
+## 1.2.0
+
+### Minor Changes
+
+- a0c3205: Add RFC 8693-style delegation support and custom action types to the
+  audit log.
+  - New `extraActions` plugin option lets projects define custom audit actions
+    (e.g. `impersonation.started`) with optional labels. They are merged into
+    the `action` select options and accepted by `writeAuditLog`.
+  - New `delegation` plugin option enables delegation-aware audit logging. It is
+    enabled by default and adds `onBehalfOf`, `onBehalfOfEmail`,
+    `onBehalfOfName`, `delegationChain`, and `delegationChainDropped` fields to
+    the audit collection.
+  - `resolveDelegation()` reads `req.user._delegatedBy` (e.g. populated from a
+    JWT `act` claim). When present, the delegator is recorded as `actor` and
+    `req.user` becomes the `onBehalfOf` subject.
+  - Nested delegation chains are flattened up to `maxChainDepth` (default `10`);
+    deeper levels are counted in `delegationChainDropped`.
+  - `writeAuditLog` accepts an explicit `onBehalfOf` override for lifecycle
+    events that need to record delegation without a delegated request object.
+
+  Usage:
+
+  ```ts
+  auditLogPlugin({
+    extraActions: [
+      { value: 'impersonation.started', label: 'Impersonation started' },
+      { value: 'impersonation.ended', label: 'Impersonation ended' },
+    ],
+    delegation: {
+      enabled: true, // default
+      maxChainDepth: 10, // default
+    },
+  })
+  ```
+
+- dac754e: Add opt-in forensic metadata to audit entries to aid breach
+  investigation, especially stolen-token scenarios. New `forensics` config
+  section captures request-derived security signals alongside each entry:
+  - `authStrategy` (default `true`): records which auth strategy authenticated
+    the request, e.g. `local-jwt`, `local-api-key`, `cookie`, or a custom
+    strategy name from `req.user._strategy`.
+  - `requestMethod` (default `true`): the HTTP method of the originating request
+    (`POST`, `GET`, …).
+  - `requestPath` (default `false`): the request URL path with the query string
+    stripped. Opt-in because paths may contain sensitive data.
+  - `tokenFingerprint` (default `false`): a non-reversible fingerprint of the
+    auth token, formatted as `<prefix8>:<sha256(token)>`. Extracted from the
+    `Authorization: Bearer <token>` and `Payload-API-Key` headers. The first 8
+    characters let an operator recognise which of their tokens it was, while the
+    SHA-256 hash enables correlation of every action performed with the same
+    token. The raw token is never stored.
+
+  All fields are conditionally added to the collection schema (like the existing
+  `multiTenant` pattern), so existing installations keep their schema unchanged
+  until they opt in. `authStrategy` and `requestMethod` default to `true`
+  because they carry no sensitive data; `requestPath` and `tokenFingerprint`
+  default to `false` and require explicit opt-in.
+
+  Usage:
+
+  ```ts
+  auditLogPlugin({
+    forensics: {
+      authStrategy: true, // default
+      requestMethod: true, // default
+      requestPath: false, // opt-in (PII risk in paths)
+      tokenFingerprint: true, // opt-in
+    },
+  })
+  ```
+
+### Patch Changes
+
+- 7ff3122: Sign changesets release commits via the GitHub API instead of the git
+  CLI so they satisfy branch protection's required commit signature check. This
+  is a CI-only change with no effect on the published package.
+
 ## 1.1.0
 
 ### Minor Changes
