@@ -221,7 +221,14 @@ export interface Media {
 export interface AuditLog {
   id: string;
   occurredAt: string;
-  action: 'create' | 'update' | 'delete' | 'file_upload' | 'file_delete';
+  action:
+    | 'create'
+    | 'update'
+    | 'delete'
+    | 'file_upload'
+    | 'file_delete'
+    | 'impersonation.started'
+    | 'impersonation.ended';
   /**
    * Slug of the collection the audited document belongs to.
    */
@@ -240,6 +247,34 @@ export interface AuditLog {
    * Snapshot of the actor's display name at the time of the action.
    */
   actorName?: string | null;
+  /**
+   * The user on whose behalf the action was performed, if any.
+   */
+  onBehalfOf?: (string | null) | User;
+  /**
+   * Snapshot of the delegated user's email at the time of the action.
+   */
+  onBehalfOfEmail?: string | null;
+  /**
+   * Snapshot of the delegated user's display name at the time of the action.
+   */
+  onBehalfOfName?: string | null;
+  /**
+   * Serialised RFC 8693-style delegation chain (innermost actor first). Empty when no delegation occurred.
+   */
+  delegationChain?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Number of delegation levels truncated because they exceeded maxChainDepth.
+   */
+  delegationChainDropped?: number | null;
   /**
    * Tenant the audited document belongs to.
    */
@@ -551,6 +586,11 @@ export interface AuditLogsSelect<T extends boolean = true> {
   actor?: T;
   actorEmail?: T;
   actorName?: T;
+  onBehalfOf?: T;
+  onBehalfOfEmail?: T;
+  onBehalfOfName?: T;
+  delegationChain?: T;
+  delegationChainDropped?: T;
   tenant?: T;
   tenantId?: T;
   tenantName?: T;

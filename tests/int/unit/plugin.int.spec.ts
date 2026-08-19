@@ -59,6 +59,11 @@ describe('auditLogPlugin (config wiring)', () => {
         'actor',
         'actorEmail',
         'actorName',
+        'onBehalfOf',
+        'onBehalfOfEmail',
+        'onBehalfOfName',
+        'delegationChain',
+        'delegationChainDropped',
         'ipAddress',
         'userAgent',
       ]),
@@ -123,5 +128,72 @@ describe('auditLogPlugin (config wiring)', () => {
     const fieldNames = (findCollection(result, 'audit-logs')?.fields ?? []).map((f: any) => f.name)
     expect(fieldNames).not.toContain('authStrategy')
     expect(fieldNames).not.toContain('requestMethod')
+  })
+
+  it('adds delegation fields by default', () => {
+    const fieldNames = (findCollection(apply(), 'audit-logs')?.fields ?? []).map((f: any) => f.name)
+    expect(fieldNames).toContain('onBehalfOf')
+    expect(fieldNames).toContain('onBehalfOfEmail')
+    expect(fieldNames).toContain('onBehalfOfName')
+    expect(fieldNames).toContain('delegationChain')
+    expect(fieldNames).toContain('delegationChainDropped')
+  })
+
+  it('can disable delegation fields via delegation config', () => {
+    const result = apply({ delegation: { enabled: false } })
+    const fieldNames = (findCollection(result, 'audit-logs')?.fields ?? []).map((f: any) => f.name)
+    expect(fieldNames).not.toContain('onBehalfOf')
+    expect(fieldNames).not.toContain('delegationChain')
+  })
+
+  it('merges extraActions into the action select options', () => {
+    const result = apply({
+      extraActions: [
+        'impersonation.started',
+        { label: 'Impersonation ended', value: 'impersonation.ended' },
+      ],
+    })
+    const auditCollection = findCollection(result, 'audit-logs')
+    const actionField = (auditCollection?.fields ?? []).find((f: any) => f.name === 'action') as
+      | { options?: Array<{ value?: string } | string> }
+      | undefined
+    const optionValues = (actionField?.options ?? []).map((o: any) =>
+      typeof o === 'string' ? o : o.value,
+    )
+    expect(optionValues).toContain('impersonation.started')
+    expect(optionValues).toContain('impersonation.ended')
+  })
+
+  it('COPILIT #3: de-duplicates extraActions by value, including built-in collisions', () => {
+    const result = apply({
+      extraActions: [
+        'impersonation.started',
+        'impersonation.started',
+        { label: 'Custom Create', value: 'create' },
+        { label: 'Impersonation ended', value: 'impersonation.ended' },
+      ],
+    })
+    const auditCollection = findCollection(result, 'audit-logs')
+    const actionField = (auditCollection?.fields ?? []).find((f: any) => f.name === 'action') as
+      | { options?: Array<{ value?: string } | string> }
+      | undefined
+    const optionValues = (actionField?.options ?? []).map((o: any) =>
+      typeof o === 'string' ? o : o.value,
+    )
+    const startedCount = optionValues.filter((v: string) => v === 'impersonation.started').length
+    const createCount = optionValues.filter((v: string) => v === 'create').length
+    expect(startedCount).toBe(1)
+    expect(createCount).toBe(1)
+  })
+
+  it('COPILIT #5: does not include actor/onBehalfOf in defaultColumns when no auth collections exist', () => {
+    const cfg: Config = {
+      collections: [{ slug: 'posts', admin: { useAsTitle: 'title' }, fields: [] }],
+    } as unknown as Config
+    const result = apply({}, cfg)
+    const auditCollection = findCollection(result, 'audit-logs')
+    const defaultColumns = (auditCollection?.admin as any)?.defaultColumns ?? []
+    expect(defaultColumns).not.toContain('actor')
+    expect(defaultColumns).not.toContain('onBehalfOf')
   })
 })

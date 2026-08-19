@@ -187,3 +187,26 @@ test.describe('audit logging (forensics: admin UI)', () => {
     await expect(page.locator('thead')).toContainText(/Token fingerprint/i, { timeout: 30_000 })
   })
 })
+
+test.describe('audit logging (delegation)', () => {
+  test('records a delegated action through the API and surfaces it in the admin UI', async ({
+    page,
+  }) => {
+    await loginAsDevUser(page)
+
+    const res = await page.request.post('/api/delegated-action')
+    expect(res.status()).toBe(200)
+    const { docId } = (await res.json()) as { docId: string }
+
+    const entry = await newestAuditEntry(page, 'posts', docId)
+    expect(entry.action).toBe('impersonation.started')
+    expect(entry.actorEmail).toBe('e2e-actor@payload-audit.local')
+    expect(entry.onBehalfOfEmail).toBe('e2e-delegated@payload-audit.local')
+    expect(entry.onBehalfOfName).toBe('E2E Delegated User')
+    expect(entry.delegationChainDropped).toBe(0)
+
+    await page.goto(`/admin/collections/audit-logs/${entry.id}`)
+    await expect(page.locator('body')).toContainText(/On behalf of/i, { timeout: 30_000 })
+    await expect(page.locator('body')).toContainText(/On behalf of email/i, { timeout: 30_000 })
+  })
+})

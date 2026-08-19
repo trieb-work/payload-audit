@@ -105,6 +105,13 @@ export const auditLogPlugin =
       tokenFingerprint: f?.tokenFingerprint ?? false,
     }
 
+    // Resolve delegation defaults. Enabled by default in enterprise setups so
+    // delegation events are never missed; existing consumers can opt out.
+    const delegation = {
+      enabled: pluginConfig.delegation?.enabled ?? true,
+      maxChainDepth: pluginConfig.delegation?.maxChainDepth ?? 10,
+    }
+
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {
         continue
@@ -117,6 +124,7 @@ export const auditLogPlugin =
         auditCollectionSlug,
         authCollectionSlugs,
         collectionSlug: collection.slug,
+        delegation,
         forensics,
         isUpload: Boolean(collection.upload),
         tenantFieldName: multiTenant?.tenantFieldName,
@@ -140,6 +148,8 @@ export const auditLogPlugin =
         slug: auditCollectionSlug,
         access: pluginConfig.access,
         authCollectionSlugs,
+        delegation,
+        extraActions: pluginConfig.extraActions,
         forensics,
         multiTenant,
       }),

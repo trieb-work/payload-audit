@@ -1,6 +1,12 @@
-import type { AuditAction, PayloadRequest } from '../types'
+import type {
+  AuditAction,
+  AuditDelegationConfig,
+  AuditDelegationUser,
+  PayloadRequest,
+} from '../types'
 
 import { type ExtractForensicsOptions, extractRequestMeta } from './extractRequestMeta'
+import { resolveDelegation } from './resolveDelegation'
 
 /**
  * Loosely-typed view of `payload.create`. The plugin is generic and must not
@@ -25,6 +31,11 @@ export interface WriteAuditLogArgs {
   authCollectionSlugs: string[]
   /** Slug of the audited collection. */
   collection: string
+  /**
+   * Delegation configuration. Controls whether `onBehalfOf` and
+   * `delegationChain` fields are written.
+   */
+  delegation?: AuditDelegationConfig
   /** ID of the audited document. */
   docId: string
   /** Human-readable label for the audited document, if resolvable. */
@@ -34,6 +45,12 @@ export interface WriteAuditLogArgs {
    * is neither extracted nor written. Omit entirely to capture only IP + UA.
    */
   forensics?: ExtractForensicsOptions
+  /**
+   * Explicit delegation override. When provided, this user is recorded as the
+   * party on whose behalf the action was performed, regardless of
+   * `req.user._delegatedBy`.
+   */
+  onBehalfOf?: AuditDelegationUser
   /** The originating request (provides actor, IP, user agent, transaction). */
   req: PayloadRequest
   /** Tenant id of the audited document (multi-tenant mode only). */
@@ -48,22 +65,29 @@ export interface WriteAuditLogArgs {
 }
 
 /**
- * Resolves the value written to the `actor` relationship field.
+ * Resolves the value written to a relationship field pointing at an auth
+ * collection user.
  *
  * For a single auth collection the field is a plain relationship, so the raw
  * user ID is returned. For multiple auth collections the field is polymorphic
  * and Payload expects a `{ relationTo, value }` shape.
  */
-function resolveActor(
-  req: PayloadRequest,
+function resolveActorValue(
+  user: AuditDelegationUser,
   authCollectionSlugs: string[],
 ): { relationTo: string; value: number | string } | null | number | string {
-  const user = req.user as { collection?: string; id?: number | string } | null
-  if (!user || user.id == null) {
+  if (user.id == null) {
     return null
   }
 
-  if (authCollectionSlugs.length > 1 && user.collection) {
+  if (authCollectionSlugs.length === 0) {
+    return null
+  }
+
+  if (authCollectionSlugs.length > 1) {
+    if (!user.collection) {
+      return null
+    }
     return { relationTo: user.collection, value: user.id }
   }
 
@@ -85,9 +109,11 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     auditCollectionSlug,
     authCollectionSlugs,
     collection,
+    delegation,
     docId,
     docTitle,
     forensics,
+    onBehalfOf,
     req,
     tenant,
     tenantFieldName,
@@ -96,25 +122,43 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
 
   const { authStrategy, ipAddress, requestMethod, requestPath, tokenFingerprint, userAgent } =
     extractRequestMeta(req, forensics)
-  const actor = resolveActor(req, authCollectionSlugs)
 
-  const user = req.user as {
-    email?: string
-    id?: number | string
-    name?: string
-  } | null
+  const delegationEnabled = delegation?.enabled !== false
+  const resolvedDelegation =
+    delegationEnabled ? resolveDelegation(req, delegation, onBehalfOf) : null
+
+  // Determine the actor relationship value and its denormalised snapshot.
+  // When delegation is present, the actor is the delegator; otherwise it is
+  // the direct request user.
+  const actorUser =
+    resolvedDelegation?.actor ?? (req.user as AuditDelegationUser | null | undefined)
+  const actor = actorUser ? resolveActorValue(actorUser, authCollectionSlugs) : null
 
   const data: Record<string, unknown> = {
     action,
     actor: actor ?? undefined,
-    actorEmail: user?.email || undefined,
-    actorName: user?.name || undefined,
+    actorEmail: actorUser?.email || undefined,
+    actorName: actorUser?.name || undefined,
     docId,
     docTitle,
     entityCollection: collection,
     ipAddress,
     occurredAt: new Date().toISOString(),
     userAgent,
+  }
+
+  // Delegation-aware fields — only written when delegation is enabled and
+  // information is actually available.
+  if (delegationEnabled && resolvedDelegation?.onBehalfOf) {
+    const delegatedUser = resolvedDelegation.onBehalfOf
+    data.onBehalfOf = resolveActorValue(delegatedUser, authCollectionSlugs) ?? undefined
+    data.onBehalfOfEmail = delegatedUser.email || undefined
+    data.onBehalfOfName = delegatedUser.name || undefined
+
+    if (resolvedDelegation.chain.length > 0) {
+      data.delegationChain = resolvedDelegation.chain
+      data.delegationChainDropped = resolvedDelegation.dropped
+    }
   }
 
   // Forensic metadata — only set when the operator has enabled capture, so

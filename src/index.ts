@@ -18,6 +18,10 @@ export {
 export {
   type AuditAccessConfig,
   type AuditAction,
+  type AuditDelegationChainEntry,
+  type AuditDelegationConfig,
+  type AuditDelegationUser,
+  type AuditExtraAction,
   type AuditHookOptions,
   type AuditLogPluginConfig,
   type AuditMultiTenantConfig,
@@ -29,6 +33,8 @@ export {
 
 export { extractRequestMeta } from './utils/extractRequestMeta'
 export { extractTenant, extractTenantName } from './utils/extractTenant'
+export { resolveDelegation } from './utils/resolveDelegation'
+export type { ResolvedDelegation } from './utils/resolveDelegation'
 export { resolveDocTitle } from './utils/resolveDocTitle'
 export { writeAuditLog } from './utils/writeAuditLog'
 export type { WriteAuditLogArgs } from './utils/writeAuditLog'
