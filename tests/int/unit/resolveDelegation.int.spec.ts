@@ -153,4 +153,41 @@ describe('resolveDelegation', () => {
     expect(result.onBehalfOf).toMatchObject({ id: 'user-1', collection: 'customers' })
     expect(result.chain[0]).toMatchObject({ id: 'admin-1', collection: 'users' })
   })
+
+  it('BUG 1: preserves actor and chain when onBehalfOf override is provided alongside _delegatedBy', () => {
+    const delegator: AuditDelegationUser = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+    }
+    const req = reqWithUser({
+      id: 'user-1',
+      name: 'User',
+      _delegatedBy: delegator,
+      email: 'user@example.com',
+    })
+    const override: AuditDelegationUser = { id: 'override-1', email: 'override@example.com' }
+
+    const result = resolveDelegation(req, {}, override)
+
+    expect(result.actor).toMatchObject({ id: 'admin-1' })
+    expect(result.chain).toEqual([{ id: 'admin-1', name: 'Admin', email: 'admin@example.com' }])
+    expect(result.onBehalfOf).toEqual(override)
+  })
+
+  it('BUG 3: does not infinite-loop on a circular delegation chain', () => {
+    const circularA: AuditDelegationUser = { id: 'a-1' }
+    const circularB: AuditDelegationUser = { id: 'b-1', _delegatedBy: circularA }
+    circularA._delegatedBy = circularB
+
+    const req = reqWithUser({
+      id: 'user-1',
+      _delegatedBy: circularA,
+    })
+
+    const result = resolveDelegation(req, { maxChainDepth: 5 })
+
+    expect(result.chain.length).toBeLessThanOrEqual(5)
+    expect(result.dropped).toBeGreaterThanOrEqual(0)
+  })
 })

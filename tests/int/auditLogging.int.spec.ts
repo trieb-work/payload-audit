@@ -274,6 +274,45 @@ describe('audit logging (delegation)', () => {
     expect(manualEntry!.onBehalfOfEmail).toBe('overridden@example.com')
     expect(manualEntry!.onBehalfOfName).toBe('Overridden User')
   })
+
+  it('BUG 2: does not leak request user email/name as actorEmail/actorName when delegator lacks them', async () => {
+    const subjectUser = await payload.create({
+      collection: 'users',
+      data: { email: 'bug2-subject@example.com', password: 'test' },
+    })
+    const delegatorUser = await payload.create({
+      collection: 'users',
+      data: { email: 'bug2-delegator@example.com', password: 'test' },
+    })
+
+    const req = {
+      headers: headers(),
+      payload,
+      user: {
+        id: subjectUser.id,
+        name: 'Subject User',
+        _delegatedBy: {
+          id: delegatorUser.id,
+          collection: 'users',
+        },
+        collection: 'users',
+        email: 'bug2-subject@example.com',
+      },
+    } as never
+
+    const post = await payload.create({
+      collection: 'posts',
+      data: { title: 'Bug 2 test' },
+      req,
+    })
+
+    const [entry] = await entriesFor('posts', String(post.id))
+    expect(entry.actor).toMatchObject({ id: delegatorUser.id })
+    expect(entry.actorEmail).not.toBe('bug2-subject@example.com')
+    expect(entry.actorName).not.toBe('Subject User')
+    expect(entry.onBehalfOfEmail).toBe('bug2-subject@example.com')
+    expect(entry.onBehalfOfName).toBe('Subject User')
+  })
 })
 
 describe('audit logging (immutability)', () => {

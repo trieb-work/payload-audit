@@ -127,17 +127,11 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     resolvedDelegation?.actor ?? (req.user as AuditDelegationUser | null | undefined)
   const actor = actorUser ? resolveActorValue(actorUser, authCollectionSlugs) : null
 
-  const user = req.user as {
-    email?: string
-    id?: number | string
-    name?: string
-  } | null
-
   const data: Record<string, unknown> = {
     action,
     actor: actor ?? undefined,
-    actorEmail: (actorUser?.email ?? user?.email) || undefined,
-    actorName: (actorUser?.name ?? user?.name) || undefined,
+    actorEmail: actorUser?.email || undefined,
+    actorName: actorUser?.name || undefined,
     docId,
     docTitle,
     entityCollection: collection,

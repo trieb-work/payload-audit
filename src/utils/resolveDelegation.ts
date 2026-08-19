@@ -56,32 +56,35 @@ export function resolveDelegation(
     return { actor: null, chain: [], dropped: 0, onBehalfOf: onBehalfOfOverride ?? null }
   }
 
-  if (onBehalfOfOverride) {
+  const user = req.user as AuditDelegationUser | null | undefined
+  const delegator = user?._delegatedBy
+
+  // No delegation info at all: actor stays null so the caller uses the
+  // direct request user.
+  if (!delegator && !onBehalfOfOverride) {
+    return { actor: null, chain: [], dropped: 0, onBehalfOf: null }
+  }
+
+  // Only an explicit override without a delegator: record the override but
+  // leave actor resolution to the caller (the direct request user).
+  if (!delegator) {
     return {
       actor: null,
       chain: [],
       dropped: 0,
-      onBehalfOf: onBehalfOfOverride,
+      onBehalfOf: onBehalfOfOverride ?? null,
     }
   }
 
-  const user = req.user as AuditDelegationUser | null | undefined
-  if (!user) {
-    return { actor: null, chain: [], dropped: 0, onBehalfOf: null }
-  }
-
-  const delegator = user._delegatedBy
-  if (!delegator) {
-    return { actor: null, chain: [], dropped: 0, onBehalfOf: null }
-  }
-
   const maxDepth = delegation?.maxChainDepth ?? DEFAULT_MAX_CHAIN_DEPTH
+  const { chain, dropped } = buildActorChain(delegator, maxDepth)
 
   return {
     actor: delegator,
-    chain: buildActorChain(delegator, maxDepth),
-    dropped: countActorChainDropped(delegator, maxDepth),
-    onBehalfOf: user,
+    chain,
+    dropped,
+    // Override takes precedence; otherwise the request user is the subject.
+    onBehalfOf: onBehalfOfOverride ?? user ?? null,
   }
 }
 
@@ -89,16 +92,27 @@ export function resolveDelegation(
  * Builds a serialised chain of actors from the immediate delegator outward.
  * The first entry is the party that actually performed the request; each
  * subsequent entry delegated authority one level further away.
+ *
+ * Uses a WeakSet to detect cycles and prevent infinite loops on malformed
+ * delegation data.
  */
 function buildActorChain(
   actor: AuditDelegationUser,
   maxDepth: number,
-): AuditDelegationChainEntry[] {
+): { chain: AuditDelegationChainEntry[]; dropped: number } {
   const chain: AuditDelegationChainEntry[] = []
+  const seen = new WeakSet<object>()
   let current: AuditDelegationUser | undefined = actor
   let depth = 0
 
   while (current && depth < maxDepth) {
+    if (seen.has(current)) {
+      // Cycle detected — stop to avoid an infinite loop. The already captured
+      // entries represent the usable chain.
+      return { chain, dropped: 0 }
+    }
+
+    seen.add(current)
     chain.push({
       id: current.id,
       name: current.name,
@@ -109,30 +123,16 @@ function buildActorChain(
     depth++
   }
 
-  return chain
-}
-
-/**
- * Counts how many delegation levels were truncated because they exceeded
- * `maxChainDepth`. Keeps audit entries honest about incomplete chains.
- */
-function countActorChainDropped(actor: AuditDelegationUser, maxDepth: number): number {
-  let current: AuditDelegationUser | undefined = actor
-  let depth = 0
-
+  // Count any remaining levels (beyond maxDepth or until a cycle) as dropped.
+  let dropped = 0
   while (current) {
-    if (depth >= maxDepth) {
-      // Count this level and any deeper ones.
-      let dropped = 0
-      while (current) {
-        dropped++
-        current = current._delegatedBy
-      }
-      return dropped
+    if (seen.has(current)) {
+      break
     }
+    seen.add(current)
+    dropped++
     current = current._delegatedBy
-    depth++
   }
 
-  return 0
+  return { chain, dropped }
 }
