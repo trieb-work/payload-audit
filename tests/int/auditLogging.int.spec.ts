@@ -133,6 +133,67 @@ describe('audit logging (immutability)', () => {
   })
 })
 
+describe('audit logging (forensics)', () => {
+  it('captures auth strategy, method, path and token fingerprint when enabled', async () => {
+    const token = 'test-forensic-token-abcdef123456'
+    const req = {
+      headers: new Headers({
+        authorization: `Bearer ${token}`,
+        'user-agent': 'forensic-test/1.0',
+        'x-forwarded-for': '203.0.113.99',
+      }),
+      method: 'POST',
+      url: 'http://localhost/api/posts?foo=bar',
+      // _strategy without an id: resolveActor returns null (no actor
+      // relationship to validate against a non-existent user), but
+      // authStrategy is still captured.
+      user: { _strategy: 'local-jwt' },
+    } as never
+
+    const post = await payload.create({
+      collection: 'posts',
+      data: { title: 'Forensic' },
+      req,
+    })
+
+    const [entry] = await entriesFor('posts', String(post.id))
+    expect(entry).toBeDefined()
+    expect(entry.authStrategy).toBe('local-jwt')
+    expect(entry.requestMethod).toBe('POST')
+    expect(entry.requestPath).toBe('/api/posts')
+    // Fingerprint = prefix8 + sha256(token); raw token must never be stored.
+    expect(entry.tokenFingerprint).toMatch(/^test-for:[0-9a-f]{64}$/)
+    expect(entry.tokenFingerprint).not.toContain(token)
+    expect(JSON.stringify(entry)).not.toContain(token)
+  })
+
+  it('correlates two actions performed with the same token', async () => {
+    const token = 'correlate-token-abcdef123456789'
+    const req = {
+      headers: new Headers({ authorization: `Bearer ${token}` }),
+      method: 'POST',
+      url: '/api/posts',
+      user: { _strategy: 'local-jwt' },
+    } as never
+
+    const post1 = await payload.create({
+      collection: 'posts',
+      data: { title: 'Correlate A' },
+      req,
+    })
+    const post2 = await payload.create({
+      collection: 'posts',
+      data: { title: 'Correlate B' },
+      req,
+    })
+
+    const [entry1] = await entriesFor('posts', String(post1.id))
+    const [entry2] = await entriesFor('posts', String(post2.id))
+    expect(entry1.tokenFingerprint).toBeDefined()
+    expect(entry1.tokenFingerprint).toBe(entry2.tokenFingerprint)
+  })
+})
+
 describe('retention pruning', () => {
   it('count-based pruning keeps only the newest maxEntries', async () => {
     for (let i = 0; i < 6; i++) {

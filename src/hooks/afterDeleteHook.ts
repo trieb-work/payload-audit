@@ -20,6 +20,7 @@ export function createAuditAfterDeleteHook(options: AuditHookOptions): Collectio
     auditCollectionSlug,
     authCollectionSlugs,
     collectionSlug,
+    forensics,
     isUpload,
     tenantFieldName,
     useAsTitle,
@@ -40,6 +41,7 @@ export function createAuditAfterDeleteHook(options: AuditHookOptions): Collectio
         collection: collectionSlug,
         docId: String(id),
         docTitle: resolveDocTitle(doc as Record<string, unknown>, id, useAsTitle),
+        forensics,
         req,
         tenant:
           tenantFieldName ?

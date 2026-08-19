@@ -13,6 +13,17 @@ export interface BuildAuditLogsCollectionArgs {
   access?: AuditAccessConfig
   /** Auth-enabled collection slugs, used to shape the `actor` relationship. */
   authCollectionSlugs: string[]
+  /**
+   * Forensic capture flags. When a flag is `true` the corresponding field is
+   * added to the collection schema. All default to `false` so existing
+   * installations do not gain new fields.
+   */
+  forensics?: {
+    authStrategy: boolean
+    requestMethod: boolean
+    requestPath: boolean
+    tokenFingerprint: boolean
+  }
   /** When set, adds a tenant relationship field for multi-tenant scoping. */
   multiTenant?: {
     tenantFieldName: string
@@ -31,7 +42,7 @@ export interface BuildAuditLogsCollectionArgs {
  * any authenticated user and can be tightened via the plugin's `access.read`.
  */
 export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): CollectionConfig {
-  const { slug, access, authCollectionSlugs, multiTenant } = args
+  const { slug, access, authCollectionSlugs, forensics, multiTenant } = args
 
   const fields: Field[] = [
     {
@@ -162,6 +173,52 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
     },
   )
 
+  // Forensic metadata — each field is added only when its flag is enabled, so
+  // existing installations keep their schema unchanged until they opt in.
+  if (forensics?.authStrategy) {
+    fields.push({
+      name: 'authStrategy',
+      type: 'text',
+      admin: {
+        description:
+          'Auth strategy that authenticated the request (e.g. local-jwt, local-api-key, cookie).',
+      },
+      index: true,
+      label: 'Auth strategy',
+    })
+  }
+
+  if (forensics?.requestMethod) {
+    fields.push({
+      name: 'requestMethod',
+      type: 'text',
+      admin: { description: 'HTTP method of the originating request.' },
+      label: 'Request method',
+    })
+  }
+
+  if (forensics?.requestPath) {
+    fields.push({
+      name: 'requestPath',
+      type: 'text',
+      admin: { description: 'Request URL path (query string stripped).' },
+      label: 'Request path',
+    })
+  }
+
+  if (forensics?.tokenFingerprint) {
+    fields.push({
+      name: 'tokenFingerprint',
+      type: 'text',
+      admin: {
+        description:
+          'Non-reversible fingerprint of the auth token: <prefix8>:<sha256(token)>. Used to correlate actions performed with the same token without storing the token itself.',
+      },
+      index: true,
+      label: 'Token fingerprint',
+    })
+  }
+
   return {
     slug,
     access: {
@@ -171,7 +228,15 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
       update: denyAccess,
     },
     admin: {
-      defaultColumns: ['occurredAt', 'action', 'entityCollection', 'docTitle', 'actor'],
+      defaultColumns: [
+        'occurredAt',
+        'action',
+        'entityCollection',
+        'docTitle',
+        'actor',
+        ...(forensics?.authStrategy ? ['authStrategy'] : []),
+        ...(forensics?.tokenFingerprint ? ['tokenFingerprint'] : []),
+      ],
       description: 'Immutable record of create, update, and delete activity across collections.',
       group: 'System',
       useAsTitle: 'docTitle',

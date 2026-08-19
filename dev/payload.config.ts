@@ -99,6 +99,14 @@ const buildConfigWithMemoryDB = async () => {
       auditLogPlugin({
         // `pages` is intentionally excluded to exercise the disabledCollections option.
         disabledCollections: ['pages'],
+        // Exercise forensic capture: auth strategy, token fingerprint, HTTP
+        // method and request path are recorded alongside each entry.
+        forensics: {
+          authStrategy: true,
+          requestMethod: true,
+          requestPath: true,
+          tokenFingerprint: true,
+        },
         // Exercise the retention/prune task. Small maxEntries keeps the dev
         // trail bounded; maxAge demonstrates age-based pruning.
         retention: {
