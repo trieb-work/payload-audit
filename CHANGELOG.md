@@ -1,5 +1,13 @@
 # @trieb.work/payload-audit
 
+## 1.3.0
+
+### Minor Changes
+
+- fee4226: Add automatic audit events for native Payload login/logout/lockout,
+  plus `emitAuthEvent` for external auth plugins such as passwordless and Better
+  Auth.
+
 ## 1.2.0
 
 ### Minor Changes
