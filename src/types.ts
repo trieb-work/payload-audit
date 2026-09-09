@@ -408,6 +408,8 @@ export interface RequestMeta {
  * useful when a consumer emits a more specific entry manually.
  */
 export interface AuditRequestContext {
+  /** Set after a failed-login / lockout audit write to avoid REST double hooks. */
+  authAuditErrorEmitted?: boolean
   skipAuditLog?: boolean
 }
 

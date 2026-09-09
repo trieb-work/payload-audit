@@ -85,6 +85,7 @@ describe('auditLogPlugin (config wiring)', () => {
     expect(users?.hooks?.afterError?.length).toBe(1)
     expect(users?.hooks?.afterRefresh?.length ?? 0).toBe(0)
     expect(users?.hooks?.afterForgotPassword?.length ?? 0).toBe(0)
+    expect(result.hooks?.afterError?.length).toBe(1)
     expect(findCollection(result, 'posts')?.hooks?.afterLogin).toBeUndefined()
   })
 
@@ -103,6 +104,7 @@ describe('auditLogPlugin (config wiring)', () => {
     expect(users?.hooks?.afterLogin?.length ?? 0).toBe(0)
     expect(users?.hooks?.afterLogout?.length ?? 0).toBe(0)
     expect(users?.hooks?.afterError?.length ?? 0).toBe(0)
+    expect(result.hooks?.afterError?.length ?? 0).toBe(0)
   })
 
   it('stores runtime config on config.custom.auditLog', () => {

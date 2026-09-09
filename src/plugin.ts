@@ -184,6 +184,11 @@ export const auditLogPlugin =
       }
     }
 
+    if (authEvents.enabled) {
+      config.hooks ??= {}
+      config.hooks.afterError = [...(config.hooks.afterError ?? []), createAuditAfterErrorHook()]
+    }
+
     config.custom = {
       ...(config.custom ?? {}),
       [AUDIT_LOG_CUSTOM_KEY]: {

@@ -1,16 +1,19 @@
-import type {
-  CollectionAfterErrorHook,
-  CollectionAfterForgotPasswordHook,
-  CollectionAfterLoginHook,
-  CollectionAfterLogoutHook,
-  CollectionAfterRefreshHook,
-  CollectionBeforeOperationHook,
-  PayloadRequest,
+import {
+  AuthenticationError,
+  type CollectionAfterErrorHook,
+  type CollectionAfterForgotPasswordHook,
+  type CollectionAfterLoginHook,
+  type CollectionAfterLogoutHook,
+  type CollectionAfterRefreshHook,
+  type CollectionBeforeOperationHook,
+  LockedAuth,
+  type PayloadRequest,
 } from 'payload'
 
-import type { AuditDelegationUser } from '../types'
+import type { AuditDelegationUser, AuditRequestContext } from '../types'
 
 import { emitAuthEvent } from '../utils/emitAuthEvent'
+import { getAuditLogCustom } from '../utils/getAuditLogCustom'
 
 const AUTH_SKIP_OPERATIONS = new Set(['forgotPassword', 'login', 'logout', 'refresh'])
 
@@ -79,39 +82,59 @@ export function createAuditAfterForgotPasswordHook(): CollectionAfterForgotPassw
   }
 }
 
+/**
+ * Records failed login / lockout. Attached to auth collections and to
+ * `config.hooks.afterError` (GraphQL and production REST where collection
+ * hooks still run — the context flag below prevents a double write).
+ *
+ * Detection cannot rely on `error.name` alone: Next production builds minify
+ * Payload's error class names, so `AuthenticationError` becomes something
+ * like `t`. `instanceof` plus 401-on-/login covers that.
+ */
 export function createAuditAfterErrorHook(): CollectionAfterErrorHook {
   return async ({ collection, error, req }) => {
-    if (isLockedAuth(error)) {
-      const identifier = extractIdentifier(req)
-      const user = await findUserByIdentifier(req, collection?.slug, identifier)
-      await emitAuthEvent({
-        event: 'account.locked',
-        identifier,
-        req,
-        user,
-      })
+    const context = req.context as AuditRequestContext
+    if (context?.authAuditErrorEmitted) {
       return
     }
 
-    if (isAuthenticationError(error)) {
-      const identifier = extractIdentifier(req)
-      const user = await findUserByIdentifier(req, collection?.slug, identifier)
-      await emitAuthEvent({
-        event: 'login.failure',
-        identifier,
-        req,
-        user,
-      })
+    const locked = isLockedAuth(error)
+    const authFailure = isAuthenticationError(error) || isLoginUnauthorized(error, req)
+
+    if (!locked && !authFailure) {
+      return
     }
+
+    req.context.authAuditErrorEmitted = true
+
+    const identifier = extractIdentifier(req)
+    const collectionSlug = collection?.slug ?? getAuditLogCustom(req)?.authCollectionSlugs[0]
+    const user = await findUserByIdentifier(req, collectionSlug, identifier)
+
+    await emitAuthEvent({
+      event: locked ? 'account.locked' : 'login.failure',
+      identifier,
+      req,
+      user,
+    })
   }
 }
 
 function isAuthenticationError(error: unknown): boolean {
-  return errorName(error) === 'AuthenticationError'
+  return error instanceof AuthenticationError || errorName(error) === 'AuthenticationError'
 }
 
 function isLockedAuth(error: unknown): boolean {
-  return errorName(error) === 'LockedAuth'
+  return error instanceof LockedAuth || errorName(error) === 'LockedAuth'
+}
+
+/**
+ * Production webpack/SWC can minify Payload error classes so both `name` and
+ * `instanceof` fail across duplicate copies of `payload`. REST login still
+ * throws 401 on `/login`.
+ */
+function isLoginUnauthorized(error: unknown, req: PayloadRequest): boolean {
+  return errorStatus(error) === 401 && isLoginRoute(req)
 }
 
 function errorName(error: unknown): string | undefined {
@@ -120,6 +143,26 @@ function errorName(error: unknown): string | undefined {
   }
   const err = error as { constructor?: { name?: string }; name?: string }
   return err.name || err.constructor?.name
+}
+
+function errorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object' || !('status' in error)) {
+    return undefined
+  }
+  const status = (error as { status?: unknown }).status
+  return typeof status === 'number' ? status : undefined
+}
+
+function isLoginRoute(req: PayloadRequest): boolean {
+  const url = req.url
+  if (typeof url !== 'string' || url.length === 0) {
+    return false
+  }
+  try {
+    return /\/login\/?$/i.test(new URL(url).pathname)
+  } catch {
+    return /\/login\/?(?:\?|$)/i.test(url)
+  }
 }
 
 function extractIdentifier(req: PayloadRequest, extra?: unknown): string | undefined {
@@ -165,7 +208,9 @@ async function findUserByIdentifier(
       collection: collectionSlug,
       limit: 1,
       overrideAccess: true,
-      where: { email: { equals: identifier } },
+      where: {
+        or: [{ email: { equals: identifier } }, { username: { equals: identifier } }],
+      },
     })
     const doc = result.docs[0]
     if (doc?.id == null) {

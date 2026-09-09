@@ -27,8 +27,9 @@ export interface EmitAuthEventArgs {
    */
   token?: string
   /**
-   * The user involved in the event. When omitted, `req.user` is used.
-   * Failed login may omit this.
+   * The user involved in the event. On success / logout this is the actor.
+   * On `login.failure` / `account.locked` this is the *target* account (for
+   * identifier capture) and is never copied onto `req.user` as the actor.
    */
   user?: AuditDelegationUser | null
 }
@@ -59,22 +60,31 @@ export async function emitAuthEvent(args: EmitAuthEventArgs): Promise<void> {
     return
   }
 
-  const collection = resolveAuthCollection(user, req, runtime.authCollectionSlugs)
-  const actorUser = resolveActorUser(user, req)
-  const knownUser = Boolean(actorUser?.id)
+  const unauthenticatedAttempt = event === 'login.failure' || event === 'account.locked'
+  const subjectUser = user && user.id != null ? user : null
+  const actorUser = unauthenticatedAttempt ? requestUser(req) : resolveActorUser(user, req)
+  const knownUser = Boolean(subjectUser?.id || (!unauthenticatedAttempt && actorUser?.id))
   const docTitle = resolveDocTitleForEvent({
     captureIdentifier: runtime.authEvents.captureIdentifier,
     event,
     identifier,
     knownUser,
-    user: actorUser,
+    user: subjectUser ?? actorUser,
   })
-  const docId = actorUser?.id != null ? String(actorUser.id) : UNKNOWN_AUTH_DOC_ID
+  const docId =
+    subjectUser?.id != null ? String(subjectUser.id)
+    : actorUser?.id != null ? String(actorUser.id)
+    : UNKNOWN_AUTH_DOC_ID
 
-  const reqForWrite = {
-    ...req,
-    user: actorUser ?? req.user,
-  } as PayloadRequest
+  const collection = resolveAuthCollection(
+    subjectUser ?? actorUser,
+    req,
+    runtime.authCollectionSlugs,
+  )
+
+  // Failed attempts must not adopt the looked-up account as `req.user`.
+  const reqForWrite =
+    unauthenticatedAttempt ? req : ({ ...req, user: actorUser ?? req.user } as PayloadRequest)
 
   try {
     await writeAuditLog({
@@ -98,6 +108,14 @@ export async function emitAuthEvent(args: EmitAuthEventArgs): Promise<void> {
   }
 }
 
+function requestUser(req: PayloadRequest): AuditDelegationUser | null {
+  const reqUser = req.user as AuditDelegationUser | null | undefined
+  if (reqUser && reqUser.id != null) {
+    return reqUser
+  }
+  return reqUser ?? null
+}
+
 function resolveActorUser(
   user: AuditDelegationUser | null | undefined,
   req: PayloadRequest,
@@ -105,11 +123,7 @@ function resolveActorUser(
   if (user && user.id != null) {
     return user
   }
-  const reqUser = req.user as AuditDelegationUser | null | undefined
-  if (reqUser && reqUser.id != null) {
-    return reqUser
-  }
-  return user ?? reqUser ?? null
+  return requestUser(req) ?? user ?? null
 }
 
 function resolveAuthCollection(

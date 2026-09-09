@@ -118,6 +118,29 @@ describe('emitAuthEvent', () => {
     expect(data.docTitle).toBe('ghost@example.com')
   })
 
+  it('does not record the target account as actor on login.failure', async () => {
+    const create = vi.fn().mockResolvedValue(undefined)
+    const payload = {
+      config: { custom: { [AUDIT_LOG_CUSTOM_KEY]: runtime() } },
+      create,
+      logger: { error: vi.fn() },
+    }
+
+    await emitAuthEvent({
+      event: 'login.failure',
+      identifier: 'a@example.com',
+      req: makeReq(payload),
+      user: { id: 'u1', collection: 'users', email: 'a@example.com' },
+    })
+
+    const args = create.mock.calls[0]?.[0]
+    expect(args.data.action).toBe('auth.login.failure')
+    expect(args.data.docId).toBe('u1')
+    expect(args.data.docTitle).toBe('a@example.com')
+    expect(args.data.actor).toBeUndefined()
+    expect(args.req.user).toBeUndefined()
+  })
+
   it('no-ops when the event is disabled', async () => {
     const create = vi.fn().mockResolvedValue(undefined)
     const payload = {
