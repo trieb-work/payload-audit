@@ -100,8 +100,8 @@ describe('createAuditAfterErrorHook', () => {
     await createAuditAfterErrorHook()({
       collection: {
         slug: 'users',
-        auth: { loginWithUsername: true },
-      } as SanitizedCollectionConfig,
+        auth: { loginWithUsername: { allowEmailLogin: true } },
+      } as unknown as SanitizedCollectionConfig,
       context: req.context,
       error,
       req,

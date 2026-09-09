@@ -200,8 +200,7 @@ function identifierFromUnknown(value: unknown): string | undefined {
 }
 
 function supportsUsernameLogin(collection?: SanitizedCollectionConfig): boolean {
-  const loginWithUsername = collection?.auth?.loginWithUsername
-  return loginWithUsername === true || typeof loginWithUsername === 'object'
+  return typeof collection?.auth?.loginWithUsername === 'object'
 }
 
 function normalizeIdentifier(identifier: string): string {
