@@ -112,8 +112,7 @@ export function createAuditAfterErrorHook(): CollectionAfterErrorHook {
     const identifier = extractIdentifier(req)
     const collectionSlug = collection?.slug ?? getAuditLogCustom(req)?.authCollectionSlugs[0]
     const collectionConfig =
-      collection ??
-      (collectionSlug ? req.payload.collections[collectionSlug]?.config : undefined)
+      collection ?? (collectionSlug ? req.payload.collections[collectionSlug]?.config : undefined)
     const user = await findUserByIdentifier(req, collectionConfig, identifier)
 
     await emitAuthEvent({
@@ -208,10 +207,7 @@ function normalizeIdentifier(identifier: string): string {
   return trimmed.includes('@') ? trimmed.toLowerCase() : trimmed
 }
 
-function buildUserLookupWhere(
-  identifier: string,
-  collection?: SanitizedCollectionConfig,
-): unknown {
+function buildUserLookupWhere(identifier: string, collection?: SanitizedCollectionConfig): unknown {
   if (supportsUsernameLogin(collection)) {
     return {
       or: [{ email: { equals: identifier } }, { username: { equals: identifier } }],

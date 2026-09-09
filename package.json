@@ -50,6 +50,7 @@
     "build:swc": "swc ./src -d ./dist --config-file .swcrc --strip-leading-paths",
     "build:types": "tsc -p tsconfig.build.json",
     "changeset": "changeset",
+    "ci:local": "bash scripts/ci-local.sh",
     "clean": "rimraf {dist,*.tsbuildinfo}",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_CONFIG_PATH=./dev/payload.config.ts next dev dev --webpack",
     "dev:generate-importmap": "pnpm dev:payload generate:importmap",
