@@ -315,6 +315,35 @@ describe('audit logging (delegation)', () => {
   })
 })
 
+describe('auth events (native Payload)', () => {
+  it('logs login.success and does not record a user update for the session write', async () => {
+    const email = `auth-login-${Date.now()}@payload-audit.local`
+    const user = await payload.create({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+    })
+    const id = String(user.id)
+    const updatesBefore = (await entriesFor('users', id)).filter(
+      (e) => e.action === 'update',
+    ).length
+
+    await payload.login({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+      req: { headers: headers() } as never,
+    })
+
+    const entries = await entriesFor('users', id)
+    const logins = entries.filter((e) => e.action === 'auth.login.success')
+    expect(logins).toHaveLength(1)
+    expect(logins[0].docTitle).toBe(email)
+    expect(logins[0].actor).toMatchObject({ id: user.id })
+    expect(logins[0].ipAddress).toBe('203.0.113.7')
+    const updatesAfter = entries.filter((e) => e.action === 'update').length
+    expect(updatesAfter).toBe(updatesBefore)
+  })
+})
+
 describe('audit logging (immutability)', () => {
   it('denies creating audit entries through the API without overrideAccess', async () => {
     await expect(

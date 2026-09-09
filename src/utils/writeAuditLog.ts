@@ -29,6 +29,11 @@ export interface WriteAuditLogArgs {
   auditCollectionSlug: string
   /** Auth-enabled collection slugs, used to shape the `actor` value. */
   authCollectionSlugs: string[]
+  /**
+   * Override the recorded auth strategy (e.g. a custom strategy name on an
+   * external login that has not yet set `req.user._strategy`).
+   */
+  authStrategy?: string
   /** Slug of the audited collection. */
   collection: string
   /**
@@ -62,6 +67,11 @@ export interface WriteAuditLogArgs {
    * Best-effort: only set when the tenant field is populated.
    */
   tenantName?: string
+  /**
+   * Explicit token to fingerprint when it is not present on request headers
+   * (e.g. the JWT returned by `afterLogin`).
+   */
+  token?: string
 }
 
 /**
@@ -108,6 +118,7 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     action,
     auditCollectionSlug,
     authCollectionSlugs,
+    authStrategy,
     collection,
     delegation,
     docId,
@@ -118,10 +129,17 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
     tenant,
     tenantFieldName,
     tenantName,
+    token,
   } = args
 
-  const { authStrategy, ipAddress, requestMethod, requestPath, tokenFingerprint, userAgent } =
-    extractRequestMeta(req, forensics)
+  const {
+    authStrategy: extractedStrategy,
+    ipAddress,
+    requestMethod,
+    requestPath,
+    tokenFingerprint,
+    userAgent,
+  } = extractRequestMeta(req, forensics, { authStrategy, token })
 
   const delegationEnabled = delegation?.enabled !== false
   const resolvedDelegation =
@@ -163,8 +181,8 @@ export async function writeAuditLog(args: WriteAuditLogArgs): Promise<void> {
 
   // Forensic metadata — only set when the operator has enabled capture, so
   // disabled fields stay absent rather than being written as `undefined`.
-  if (forensics?.authStrategy && authStrategy) {
-    data.authStrategy = authStrategy
+  if (forensics?.authStrategy && extractedStrategy) {
+    data.authStrategy = extractedStrategy
   }
   if (forensics?.requestMethod && requestMethod) {
     data.requestMethod = requestMethod

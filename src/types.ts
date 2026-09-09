@@ -17,12 +17,100 @@ export const DEFAULT_AUDIT_COLLECTION_SLUG = 'audit-logs'
  * preserving autocomplete for the built-in actions.
  */
 export type AuditAction =
+  | 'auth.account.locked'
+  | 'auth.login.failure'
+  | 'auth.login.success'
+  | 'auth.logout'
+  | 'auth.password.forgot'
+  | 'auth.token.refresh'
   | 'create'
   | 'delete'
   | 'file_delete'
   | 'file_upload'
   | 'update'
   | ({} & string)
+
+/**
+ * Auth lifecycle events accepted by {@link emitAuthEvent}. Mapped 1:1 onto
+ * the `auth.*` {@link AuditAction} values stored in the trail.
+ */
+export type AuditAuthEvent =
+  | 'account.locked'
+  | 'login.failure'
+  | 'login.success'
+  | 'logout'
+  | 'password.forgot'
+  | 'token.refresh'
+
+/**
+ * Which identifier (email/username) to persist on failed-auth entries.
+ *
+ * - `known-user` (default) — store the identifier only when an account exists.
+ * - `always` — store the submitted identifier even when no user matches.
+ * - `false` — never persist the identifier on failure events.
+ */
+export type AuditAuthCaptureIdentifier = 'always' | 'known-user' | false
+
+/**
+ * Automatic auditing of Payload's own auth operations (login, logout, …).
+ * External auth plugins that bypass `payload.login()` should call
+ * {@link emitAuthEvent} instead.
+ */
+export interface AuditAuthEventsConfig {
+  /**
+   * Persist the login identifier on failure/lock events. Default:
+   * `known-user`.
+   */
+  captureIdentifier?: AuditAuthCaptureIdentifier
+  /** Master switch for automatic auth-event hooks. Default: `true`. */
+  enabled?: boolean
+  /**
+   * Per-event switches. `login`, `loginFailure`, `logout`, and `accountLocked`
+   * default to `true`; `refresh` and `forgotPassword` default to `false`.
+   */
+  events?: {
+    accountLocked?: boolean
+    forgotPassword?: boolean
+    login?: boolean
+    loginFailure?: boolean
+    logout?: boolean
+    refresh?: boolean
+  }
+}
+
+/** Resolved auth-event flags stored on `config.custom.auditLog`. */
+export interface ResolvedAuditAuthEventsConfig {
+  captureIdentifier: AuditAuthCaptureIdentifier
+  enabled: boolean
+  events: {
+    accountLocked: boolean
+    forgotPassword: boolean
+    login: boolean
+    loginFailure: boolean
+    logout: boolean
+    refresh: boolean
+  }
+}
+
+/**
+ * Runtime options the plugin stores on `payload.config.custom.auditLog` so
+ * {@link emitAuthEvent} can be called with only `req` + event.
+ */
+export interface AuditLogCustomConfig {
+  auditCollectionSlug: string
+  authCollectionSlugs: string[]
+  authEvents: ResolvedAuditAuthEventsConfig
+  delegation: AuditDelegationConfig
+  forensics: {
+    authStrategy: boolean
+    requestMethod: boolean
+    requestPath: boolean
+    tokenFingerprint: boolean
+  }
+}
+
+/** Key under `payload.config.custom` where {@link AuditLogCustomConfig} lives. */
+export const AUDIT_LOG_CUSTOM_KEY = 'auditLog'
 
 /**
  * Retention policy for audit log entries. Both limits may be set at once; a
@@ -217,6 +305,12 @@ export interface AuditDelegationConfig {
 export interface AuditLogPluginConfig {
   /** Access control for the audit log collection. */
   access?: AuditAccessConfig
+  /**
+   * Automatic audit entries for Payload auth operations (login, logout,
+   * failed login, lockout). Default: enabled. External auth that does not go
+   * through `payload.login()` should call `emitAuthEvent`.
+   */
+  authEvents?: AuditAuthEventsConfig
   /**
    * Override the slug of the generated audit log collection.
    * Default: `audit-logs`.

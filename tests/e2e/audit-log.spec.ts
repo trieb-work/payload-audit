@@ -4,8 +4,10 @@ import { createHash } from 'node:crypto'
 import {
   auditRowsContaining,
   createDoc,
+  DEV_USER,
   loginAsDevUser,
   loginViaApi,
+  newestAuditByAction,
   newestAuditEntry,
 } from './helpers'
 
@@ -185,6 +187,37 @@ test.describe('audit logging (forensics: admin UI)', () => {
     await page.waitForSelector('.collection-list, .no-results', { timeout: 30_000 })
     await expect(page.locator('thead')).toContainText(/Auth strategy/i, { timeout: 30_000 })
     await expect(page.locator('thead')).toContainText(/Token fingerprint/i, { timeout: 30_000 })
+  })
+})
+
+test.describe('audit logging (native auth events)', () => {
+  test('admin login writes auth.login.success', async ({ page }) => {
+    await loginAsDevUser(page)
+    const entry = await newestAuditByAction(page, 'auth.login.success')
+    expect(entry.docTitle).toBe(DEV_USER.email)
+    expect(entry.entityCollection).toBe('users')
+  })
+
+  test('failed REST login writes auth.login.failure', async ({ page }) => {
+    const failed = await page.request.post('/api/users/login', {
+      data: { email: DEV_USER.email, password: 'definitely-wrong' },
+    })
+    expect(failed.status()).toBe(401)
+
+    await loginAsDevUser(page)
+    const entry = await newestAuditByAction(page, 'auth.login.failure')
+    expect(entry.docTitle).toBe(DEV_USER.email)
+    expect(entry.entityCollection).toBe('users')
+  })
+
+  test('logout writes auth.logout', async ({ page }) => {
+    await loginAsDevUser(page)
+    const logoutRes = await page.request.post('/api/users/logout')
+    expect(logoutRes.ok()).toBe(true)
+
+    await loginAsDevUser(page)
+    const entry = await newestAuditByAction(page, 'auth.logout')
+    expect(entry.entityCollection).toBe('users')
   })
 })
 

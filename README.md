@@ -24,6 +24,9 @@ what, when" activity log for any Payload project.
 
 - **Zero-config coverage** — hooks into every collection automatically, with an
   opt-out list (`disabledCollections`). No per-collection setup.
+- **Auth events** — native Payload login/logout/lockout are recorded
+  automatically; external auth (passwordless, Better Auth, …) uses a one-line
+  `emitAuthEvent` call.
 - **Immutable audit trail** — the generated `audit-logs` collection denies
   create/update/delete through the API; entries can only be written internally
   by the plugin, so the log can't be altered or deleted by users.
@@ -119,6 +122,90 @@ auditLogPlugin({
 })
 ```
 
+## Authentication events
+
+Native Payload auth (email/password, API keys, anything that goes through
+`payload.login()` / `logout()` / `refresh()`) is recorded automatically:
+
+- `auth.login.success` / `auth.login.failure`
+- `auth.logout`
+- `auth.account.locked` (when `maxLoginAttempts` is enabled)
+- `auth.token.refresh` and `auth.password.forgot` are **off** by default (noisy
+  / PII). Enable them via `authEvents.events`.
+
+```ts
+auditLogPlugin({
+  authEvents: {
+    events: { refresh: true },
+    captureIdentifier: 'known-user', // default: store email only if the account exists
+  },
+})
+```
+
+Internal user-document writes during login (`sessions`, `loginAttempts`) are not
+logged as `update`.
+
+Failed login and lockout are recorded via Payload's `afterError` hook, which
+runs for REST and GraphQL. Local API `payload.login()` rethrows without that
+hook, so those paths are covered by HTTP-level tests.
+
+### External auth (`emitAuthEvent`)
+
+Plugins that replace Payload's login (passwordless, Better Auth, custom
+endpoints) never fire `afterLogin`. Call `emitAuthEvent` at the login / logout /
+failure site — the plugin already stored its options on `payload.config.custom`,
+so the call is one argument besides `req`:
+
+```ts
+import { emitAuthEvent } from '@trieb.work/payload-audit'
+
+await emitAuthEvent({ req, event: 'login.success', user })
+await emitAuthEvent({ req, event: 'login.failure', identifier: email })
+await emitAuthEvent({ req, event: 'logout', user })
+```
+
+Register the **auth plugin first**, then `auditLogPlugin`, then attach hooks to
+collections the auth plugin created (e.g. `sessions`):
+
+```ts
+import type { Plugin } from 'payload'
+import { emitAuthEvent } from '@trieb.work/payload-audit'
+
+plugins: [authPlugin(), auditLogPlugin(), attachSessionAuthAudit('sessions')]
+
+function attachSessionAuthAudit(slug: string): Plugin {
+  return (config) => {
+    const collection = config.collections?.find((c) => c.slug === slug)
+    if (!collection) return config
+    collection.hooks ??= {}
+    collection.hooks.afterChange = [
+      ...(collection.hooks.afterChange ?? []),
+      async ({ doc, operation, req }) => {
+        if (operation === 'create') {
+          const user =
+            typeof doc.user === 'object' ? doc.user : { id: doc.user }
+          await emitAuthEvent({ req, event: 'login.success', user })
+        }
+        return doc
+      },
+    ]
+    collection.hooks.afterDelete = [
+      ...(collection.hooks.afterDelete ?? []),
+      async ({ doc, req }) => {
+        const user =
+          typeof doc?.user === 'object' ? doc.user : { id: doc?.user }
+        await emitAuthEvent({ req, event: 'logout', user })
+        return doc
+      },
+    ]
+    return config
+  }
+}
+```
+
+The same snippet works for Better Auth (`payload-auth`): use the session
+collection slug that plugin registers (`sessions` by default).
+
 See the exported TypeScript types (`AuditLogPluginConfig` and friends) for the
 full reference and inline documentation.
 
@@ -154,7 +241,9 @@ The test suite is split into three layers:
 - **Integration tests** (`pnpm test:int`) — Same Vitest run, but tests live
   against a real Payload instance (via `getPayload` with the dev config and
   `mongodb-memory-server`). Covers create/update/delete logging, upload
-  tracking, multi-tenant scoping, retention pruning, and immutability.
+  tracking, multi-tenant scoping, retention pruning, immutability, native login
+  events, and `emitAuthEvent` against real `@trieb.work/payload-auth-pwless` and
+  `payload-auth` (Better Auth).
 
 - **E2E tests** (`pnpm test:e2e`) — Playwright tests against the running admin
   UI. Requires a **built dev app** first:

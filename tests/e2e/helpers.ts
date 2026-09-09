@@ -5,6 +5,22 @@ import { expect } from '@playwright/test'
 /** Seeded in `dev/seed.ts`. */
 export const DEV_USER = { email: 'dev@payload-audit.local', password: 'test' }
 
+/**
+ * Newest audit entry matching an action (and optional collection / docId).
+ */
+export async function newestAuditByAction(
+  page: Page,
+  action: string,
+): Promise<Record<string, any>> {
+  const res = await page.request.get(
+    `/api/audit-logs?where[action][equals]=${encodeURIComponent(action)}&sort=-occurredAt&limit=1`,
+  )
+  expect(res.status()).toBe(200)
+  const body = (await res.json()) as { docs: Array<Record<string, any>> }
+  expect(body.docs[0]).toBeDefined()
+  return body.docs[0]
+}
+
 /** Logs in to the admin panel and waits for the dashboard to render. */
 export async function loginAsDevUser(page: Page): Promise<void> {
   await page.goto('/admin')

@@ -5,8 +5,17 @@ import type { AuditLogPluginConfig } from './types'
 import { buildAuditLogsCollection } from './collections/auditLogs'
 import { createAuditAfterChangeHook } from './hooks/afterChangeHook'
 import { createAuditAfterDeleteHook } from './hooks/afterDeleteHook'
+import {
+  createAuditAfterErrorHook,
+  createAuditAfterForgotPasswordHook,
+  createAuditAfterLoginHook,
+  createAuditAfterLogoutHook,
+  createAuditAfterRefreshHook,
+  createAuditBeforeOperationHook,
+} from './hooks/authEventHooks'
 import { createPruneAuditLogsTask } from './tasks/pruneAuditLogs'
-import { DEFAULT_AUDIT_COLLECTION_SLUG } from './types'
+import { AUDIT_LOG_CUSTOM_KEY, DEFAULT_AUDIT_COLLECTION_SLUG } from './types'
+import { resolveAuthEventsConfig } from './utils/resolveAuthEvents'
 
 /**
  * Payload's internal collections. These are never audited: they are framework
@@ -112,6 +121,8 @@ export const auditLogPlugin =
       maxChainDepth: pluginConfig.delegation?.maxChainDepth ?? 10,
     }
 
+    const authEvents = resolveAuthEventsConfig(pluginConfig.authEvents)
+
     for (const collection of collections) {
       if (disabled.has(collection.slug)) {
         continue
@@ -140,6 +151,48 @@ export const auditLogPlugin =
         ...(collection.hooks.afterDelete ?? []),
         createAuditAfterDeleteHook(hookOptions),
       ]
+
+      if (authEvents.enabled && collection.auth) {
+        collection.hooks.beforeOperation = [
+          ...(collection.hooks.beforeOperation ?? []),
+          createAuditBeforeOperationHook(),
+        ]
+        collection.hooks.afterLogin = [
+          ...(collection.hooks.afterLogin ?? []),
+          createAuditAfterLoginHook(),
+        ]
+        collection.hooks.afterLogout = [
+          ...(collection.hooks.afterLogout ?? []),
+          createAuditAfterLogoutHook(),
+        ]
+        collection.hooks.afterError = [
+          ...(collection.hooks.afterError ?? []),
+          createAuditAfterErrorHook(),
+        ]
+        if (authEvents.events.refresh) {
+          collection.hooks.afterRefresh = [
+            ...(collection.hooks.afterRefresh ?? []),
+            createAuditAfterRefreshHook(),
+          ]
+        }
+        if (authEvents.events.forgotPassword) {
+          collection.hooks.afterForgotPassword = [
+            ...(collection.hooks.afterForgotPassword ?? []),
+            createAuditAfterForgotPasswordHook(),
+          ]
+        }
+      }
+    }
+
+    config.custom = {
+      ...(config.custom ?? {}),
+      [AUDIT_LOG_CUSTOM_KEY]: {
+        auditCollectionSlug,
+        authCollectionSlugs,
+        authEvents,
+        delegation,
+        forensics,
+      },
     }
 
     config.collections = [
@@ -148,6 +201,7 @@ export const auditLogPlugin =
         slug: auditCollectionSlug,
         access: pluginConfig.access,
         authCollectionSlugs,
+        authEvents,
         delegation,
         extraActions: pluginConfig.extraActions,
         forensics,
