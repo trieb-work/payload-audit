@@ -18,6 +18,17 @@ import { getAuditLogCustom } from '../utils/getAuditLogCustom'
 
 const AUTH_SKIP_OPERATIONS = new Set(['forgotPassword', 'login', 'logout', 'refresh'])
 
+function markAuthInternalAudit(req: PayloadRequest): void {
+  req.context = { ...(req.context ?? {}), skipAuthInternalAudit: true }
+}
+
+function clearAuthInternalAudit(req: PayloadRequest): void {
+  const context = req.context as AuditRequestContext
+  if (context) {
+    delete context.skipAuthInternalAudit
+  }
+}
+
 interface LooseFindPayload {
   find: (args: {
     collection: string
@@ -35,7 +46,7 @@ interface LooseFindPayload {
 export function createAuditBeforeOperationHook(): CollectionBeforeOperationHook {
   return ({ args, operation }) => {
     if (AUTH_SKIP_OPERATIONS.has(String(operation)) && args.req) {
-      args.req.context = { ...(args.req.context ?? {}), skipAuditLog: true }
+      markAuthInternalAudit(args.req)
     }
     return args
   }
@@ -49,6 +60,7 @@ export function createAuditAfterLoginHook(): CollectionAfterLoginHook {
       token,
       user: user as AuditDelegationUser,
     })
+    clearAuthInternalAudit(req)
     return user
   }
 }
@@ -56,6 +68,7 @@ export function createAuditAfterLoginHook(): CollectionAfterLoginHook {
 export function createAuditAfterLogoutHook(): CollectionAfterLogoutHook {
   return async ({ req }) => {
     await emitAuthEvent({ event: 'logout', req })
+    clearAuthInternalAudit(req)
   }
 }
 
@@ -67,6 +80,7 @@ export function createAuditAfterRefreshHook(): CollectionAfterRefreshHook {
       token: typeof token === 'string' ? token : undefined,
       user: req.user as AuditDelegationUser | undefined,
     })
+    clearAuthInternalAudit(req)
   }
 }
 
@@ -81,6 +95,7 @@ export function createAuditAfterForgotPasswordHook(): CollectionAfterForgotPassw
     }
     const identifier = extractIdentifier(req, hookArgs.args)
     await emitAuthEvent({ event: 'password.forgot', identifier, req })
+    clearAuthInternalAudit(req)
   }
 }
 
@@ -121,6 +136,7 @@ export function createAuditAfterErrorHook(): CollectionAfterErrorHook {
       req,
       user,
     })
+    clearAuthInternalAudit(req)
   }
 }
 

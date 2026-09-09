@@ -411,6 +411,12 @@ export interface AuditRequestContext {
   /** Set after a failed-login / lockout audit write to avoid REST double hooks. */
   authAuditErrorEmitted?: boolean
   skipAuditLog?: boolean
+  /**
+   * Set during Payload auth operations. Suppresses only auth-collection document
+   * hooks (internal `sessions` / `loginAttempts` writes), not cross-collection
+   * writes on the same request.
+   */
+  skipAuthInternalAudit?: boolean
 }
 
 export type { Access, PayloadRequest }

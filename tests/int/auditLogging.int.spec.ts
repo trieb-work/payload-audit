@@ -342,6 +342,71 @@ describe('auth events (native Payload)', () => {
     const updatesAfter = entries.filter((e) => e.action === 'update').length
     expect(updatesAfter).toBe(updatesBefore)
   })
+
+  it('still audits a host afterLogin write on a different collection', async () => {
+    const title = `login-side-write-${Date.now()}`
+    const usersConfig = payload.collections.users.config
+    const hostHook = async ({ req }: { req: { context?: unknown } }) => {
+      await payload.create({
+        collection: 'posts',
+        data: { title },
+        req: req as never,
+      })
+    }
+    usersConfig.hooks.afterLogin = [hostHook, ...(usersConfig.hooks.afterLogin ?? [])]
+
+    try {
+      const email = `auth-skip-leak-${Date.now()}@payload-audit.local`
+      await payload.create({
+        collection: 'users',
+        data: { email, password: 'test-pass-1' },
+      })
+      await payload.login({
+        collection: 'users',
+        data: { email, password: 'test-pass-1' },
+        req: { headers: headers() } as never,
+      })
+
+      const posts = await payload.find({
+        collection: 'posts',
+        limit: 1,
+        overrideAccess: true,
+        where: { title: { equals: title } },
+      })
+      expect(posts.docs).toHaveLength(1)
+      const actions = (await entriesFor('posts', String(posts.docs[0].id))).map((e) => e.action)
+      expect(actions).toContain('create')
+    } finally {
+      usersConfig.hooks.afterLogin = (usersConfig.hooks.afterLogin ?? []).filter(
+        (hook) => hook !== hostHook,
+      )
+    }
+  })
+
+  it('still audits writes reused on the login request after login returns', async () => {
+    const email = `auth-skip-reuse-${Date.now()}@payload-audit.local`
+    await payload.create({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+    })
+    const req = { context: {}, headers: headers() } as never
+    await payload.login({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+      req,
+    })
+
+    const post = await payload.create({
+      collection: 'posts',
+      data: { title: `after-login-req-${Date.now()}` },
+      req,
+    })
+    const createdId = String(post.id)
+    expect((await entriesFor('posts', createdId)).map((e) => e.action)).toContain('create')
+
+    await payload.delete({ id: post.id, collection: 'posts', req })
+    expect((await entriesFor('posts', createdId)).map((e) => e.action)).toContain('delete')
+  })
 })
 
 describe('audit logging (immutability)', () => {
