@@ -61,6 +61,30 @@ describe('createAuditAfterErrorHook', () => {
     expect(create.mock.calls[0]?.[0]?.data.action).toBe('auth.login.failure')
   })
 
+  it('queries email only on collections without username login', async () => {
+    const create = vi.fn().mockResolvedValue(undefined)
+    const { find, req } = makeReq(create, [{ id: 'u1', email: 'dev@example.com' }])
+    const error = Object.assign(new Error('email or password incorrect'), {
+      name: 'AuthenticationError',
+      status: 401,
+    })
+
+    await createAuditAfterErrorHook()({
+      collection: { slug: 'users' } as SanitizedCollectionConfig,
+      context: req.context,
+      error,
+      req,
+    })
+
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'users',
+        where: { email: { equals: 'dev@example.com' } },
+      }),
+    )
+    expect(create.mock.calls[0]?.[0]?.data.docTitle).toBe('dev@example.com')
+  })
+
   it('links failed username login to the account via username lookup', async () => {
     const create = vi.fn().mockResolvedValue(undefined)
     const { find, req } = makeReq(
@@ -74,7 +98,10 @@ describe('createAuditAfterErrorHook', () => {
     })
 
     await createAuditAfterErrorHook()({
-      collection: { slug: 'users' } as SanitizedCollectionConfig,
+      collection: {
+        slug: 'users',
+        auth: { loginWithUsername: true },
+      } as SanitizedCollectionConfig,
       context: req.context,
       error,
       req,

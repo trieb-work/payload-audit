@@ -8,6 +8,7 @@ import {
   type CollectionBeforeOperationHook,
   LockedAuth,
   type PayloadRequest,
+  type SanitizedCollectionConfig,
 } from 'payload'
 
 import type { AuditDelegationUser, AuditRequestContext } from '../types'
@@ -22,6 +23,7 @@ interface LooseFindPayload {
     collection: string
     limit?: number
     overrideAccess?: boolean
+    req?: PayloadRequest
     where?: unknown
   }) => Promise<{ docs: Array<Record<string, unknown>> }>
 }
@@ -109,7 +111,10 @@ export function createAuditAfterErrorHook(): CollectionAfterErrorHook {
 
     const identifier = extractIdentifier(req)
     const collectionSlug = collection?.slug ?? getAuditLogCustom(req)?.authCollectionSlugs[0]
-    const user = await findUserByIdentifier(req, collectionSlug, identifier)
+    const collectionConfig =
+      collection ??
+      (collectionSlug ? req.payload.collections[collectionSlug]?.config : undefined)
+    const user = await findUserByIdentifier(req, collectionConfig, identifier)
 
     await emitAuthEvent({
       event: locked ? 'account.locked' : 'login.failure',
@@ -194,11 +199,34 @@ function identifierFromUnknown(value: unknown): string | undefined {
   return undefined
 }
 
+function supportsUsernameLogin(collection?: SanitizedCollectionConfig): boolean {
+  const loginWithUsername = collection?.auth?.loginWithUsername
+  return loginWithUsername === true || typeof loginWithUsername === 'object'
+}
+
+function normalizeIdentifier(identifier: string): string {
+  const trimmed = identifier.trim()
+  return trimmed.includes('@') ? trimmed.toLowerCase() : trimmed
+}
+
+function buildUserLookupWhere(
+  identifier: string,
+  collection?: SanitizedCollectionConfig,
+): unknown {
+  if (supportsUsernameLogin(collection)) {
+    return {
+      or: [{ email: { equals: identifier } }, { username: { equals: identifier } }],
+    }
+  }
+  return { email: { equals: identifier } }
+}
+
 async function findUserByIdentifier(
   req: PayloadRequest,
-  collectionSlug: string | undefined,
+  collection: SanitizedCollectionConfig | undefined,
   identifier: string | undefined,
 ): Promise<AuditDelegationUser | null> {
+  const collectionSlug = collection?.slug
   if (!identifier || !collectionSlug) {
     return null
   }
@@ -208,9 +236,8 @@ async function findUserByIdentifier(
       collection: collectionSlug,
       limit: 1,
       overrideAccess: true,
-      where: {
-        or: [{ email: { equals: identifier } }, { username: { equals: identifier } }],
-      },
+      req,
+      where: buildUserLookupWhere(normalizeIdentifier(identifier), collection),
     })
     const doc = result.docs[0]
     if (doc?.id == null) {
