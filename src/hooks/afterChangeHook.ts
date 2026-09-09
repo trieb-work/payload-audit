@@ -1,9 +1,10 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
-import type { AuditAction, AuditHookOptions, AuditRequestContext } from '../types'
+import type { AuditAction, AuditHookOptions } from '../types'
 
 import { extractTenant, extractTenantName } from '../utils/extractTenant'
 import { resolveDocTitle } from '../utils/resolveDocTitle'
+import { shouldSkipDocumentAudit } from '../utils/shouldSkipDocumentAudit'
 import { writeAuditLog } from '../utils/writeAuditLog'
 
 /**
@@ -14,8 +15,9 @@ import { writeAuditLog } from '../utils/writeAuditLog'
  * standard `create` / `update` actions.
  *
  * Failures are logged but never thrown — audit logging must not break the
- * operation that triggered it. Setting `context.skipAuditLog = true` opts a
- * single operation out (e.g. when a consumer records a more specific entry).
+ * operation that triggered it. `context.skipAuditLog` opts a single operation
+ * out; `skipAuthInternalAudit` suppresses only auth-collection writes during
+ * Payload login/logout handling.
  */
 export function createAuditAfterChangeHook(options: AuditHookOptions): CollectionAfterChangeHook {
   const {
@@ -30,7 +32,7 @@ export function createAuditAfterChangeHook(options: AuditHookOptions): Collectio
   } = options
 
   return async ({ context, doc, operation, req }) => {
-    if ((context as AuditRequestContext)?.skipAuditLog === true) {
+    if (shouldSkipDocumentAudit(context, collectionSlug, authCollectionSlugs)) {
       return doc
     }
 

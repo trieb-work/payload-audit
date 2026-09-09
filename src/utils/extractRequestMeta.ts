@@ -14,6 +14,12 @@ export interface ExtractForensicsOptions {
   tokenFingerprint: boolean
 }
 
+/** Optional overrides for strategy / a freshly issued token (e.g. afterLogin). */
+export interface ExtractRequestMetaOverrides {
+  authStrategy?: string
+  token?: string
+}
+
 /**
  * Extracts the client IP address and user agent from a Payload request.
  *
@@ -33,11 +39,12 @@ export interface ExtractForensicsOptions {
 export function extractRequestMeta(
   req: PayloadRequest | undefined,
   forensics?: ExtractForensicsOptions,
+  overrides?: ExtractRequestMetaOverrides,
 ): RequestMeta {
   const headers = req?.headers
 
   if (!headers || typeof headers.get !== 'function') {
-    return forensics ? extractForensics(req, forensics) : {}
+    return forensics ? extractForensics(req, forensics, overrides) : {}
   }
 
   const forwardedFor = headers.get('x-forwarded-for')
@@ -55,7 +62,7 @@ export function extractRequestMeta(
   }
 
   if (forensics) {
-    Object.assign(meta, extractForensics(req, forensics))
+    Object.assign(meta, extractForensics(req, forensics, overrides))
   }
 
   return meta
@@ -69,11 +76,13 @@ export function extractRequestMeta(
 function extractForensics(
   req: PayloadRequest | undefined,
   opts: ExtractForensicsOptions,
+  overrides?: ExtractRequestMetaOverrides,
 ): RequestMeta {
   const meta: RequestMeta = {}
 
   if (opts.authStrategy) {
-    const strategy = (req?.user as { _strategy?: string } | null | undefined)?._strategy
+    const strategy =
+      overrides?.authStrategy || (req?.user as { _strategy?: string } | null | undefined)?._strategy
     if (strategy) {
       meta.authStrategy = strategy
     }
@@ -96,7 +105,7 @@ function extractForensics(
   }
 
   if (opts.tokenFingerprint) {
-    const fingerprint = resolveTokenFingerprint(req?.headers)
+    const fingerprint = fingerprintToken(overrides?.token) || resolveTokenFingerprint(req?.headers)
     if (fingerprint) {
       meta.tokenFingerprint = fingerprint
     }
@@ -118,21 +127,13 @@ function extractForensics(
  * takes precedence. Cookie-based session auth does not expose a bearer token in
  * a stable header, so `undefined` is returned for those requests.
  */
-function resolveTokenFingerprint(headers: Headers | undefined): string | undefined {
-  if (!headers || typeof headers.get !== 'function') {
-    return undefined
-  }
-
-  const authorization = headers.get('authorization') || headers.get('Authorization')
-  const bearerMatch = authorization?.match(/^Bearer\s+(\S+)$/i)
-  const token =
-    bearerMatch?.[1] ||
-    headers.get('payload-api-key') ||
-    headers.get('Payload-API-Key') ||
-    undefined
-
+/**
+ * Non-reversible fingerprint of an auth token: `<prefix8>:<sha256(token)>`.
+ * Returns `undefined` when the token is missing or too short to fingerprint
+ * without revealing most of it.
+ */
+export function fingerprintToken(token: string | undefined): string | undefined {
   if (!token || token.length < 8) {
-    // Too short to safely fingerprint (prefix would reveal most of the token).
     return undefined
   }
 
@@ -148,7 +149,22 @@ function resolveTokenFingerprint(headers: Headers | undefined): string | undefin
     const hash = createHash('sha256').update(token).digest('hex')
     return `${token.slice(0, 8)}:${hash}`
   } catch {
-    // `node:crypto` unavailable (e.g. restricted runtime) — best-effort.
     return undefined
   }
+}
+
+function resolveTokenFingerprint(headers: Headers | undefined): string | undefined {
+  if (!headers || typeof headers.get !== 'function') {
+    return undefined
+  }
+
+  const authorization = headers.get('authorization') || headers.get('Authorization')
+  const bearerMatch = authorization?.match(/^Bearer\s+(\S+)$/i)
+  const token =
+    bearerMatch?.[1] ||
+    headers.get('payload-api-key') ||
+    headers.get('Payload-API-Key') ||
+    undefined
+
+  return fingerprintToken(token)
 }

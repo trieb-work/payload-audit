@@ -76,6 +76,70 @@ describe('auditLogPlugin (config wiring)', () => {
     expect(auditHookCount(result, 'users')).toEqual({ afterChange: 1, afterDelete: 1 })
   })
 
+  it('injects auth-event hooks on auth collections only', () => {
+    const result = apply()
+    const users = findCollection(result, 'users')
+    expect(users?.hooks?.beforeOperation?.length).toBe(1)
+    expect(users?.hooks?.afterLogin?.length).toBe(1)
+    expect(users?.hooks?.afterLogout?.length).toBe(1)
+    expect(users?.hooks?.afterError?.length).toBe(1)
+    expect(users?.hooks?.afterRefresh?.length ?? 0).toBe(0)
+    expect(users?.hooks?.afterForgotPassword?.length ?? 0).toBe(0)
+    expect(result.hooks?.afterError?.length).toBe(1)
+    expect(findCollection(result, 'posts')?.hooks?.afterLogin).toBeUndefined()
+  })
+
+  it('attaches afterRefresh and afterForgotPassword only when those events are enabled', () => {
+    const result = apply({
+      authEvents: { events: { forgotPassword: true, refresh: true } },
+    })
+    const users = findCollection(result, 'users')
+    expect(users?.hooks?.afterRefresh?.length).toBe(1)
+    expect(users?.hooks?.afterForgotPassword?.length).toBe(1)
+  })
+
+  it('skips auth-event hooks when authEvents.enabled is false', () => {
+    const result = apply({ authEvents: { enabled: false } })
+    const users = findCollection(result, 'users')
+    expect(users?.hooks?.afterLogin?.length ?? 0).toBe(0)
+    expect(users?.hooks?.afterLogout?.length ?? 0).toBe(0)
+    expect(users?.hooks?.afterError?.length ?? 0).toBe(0)
+    expect(result.hooks?.afterError?.length ?? 0).toBe(0)
+  })
+
+  it('stores runtime config on config.custom.auditLog', () => {
+    const result = apply()
+    const stored = (result.custom as { auditLog?: { auditCollectionSlug?: string } } | undefined)
+      ?.auditLog
+    expect(stored?.auditCollectionSlug).toBe('audit-logs')
+  })
+
+  it('includes auth actions in the action select by default', () => {
+    const result = apply()
+    const auditCollection = findCollection(result, 'audit-logs')
+    const actionField = (auditCollection?.fields ?? []).find((f: any) => f.name === 'action') as
+      | { options?: Array<{ value?: string } | string> }
+      | undefined
+    const optionValues = (actionField?.options ?? []).map((o: any) =>
+      typeof o === 'string' ? o : o.value,
+    )
+    expect(optionValues).toContain('auth.login.success')
+    expect(optionValues).toContain('auth.login.failure')
+    expect(optionValues).toContain('auth.logout')
+  })
+
+  it('omits auth actions when authEvents.enabled is false', () => {
+    const result = apply({ authEvents: { enabled: false } })
+    const auditCollection = findCollection(result, 'audit-logs')
+    const actionField = (auditCollection?.fields ?? []).find((f: any) => f.name === 'action') as
+      | { options?: Array<{ value?: string } | string> }
+      | undefined
+    const optionValues = (actionField?.options ?? []).map((o: any) =>
+      typeof o === 'string' ? o : o.value,
+    )
+    expect(optionValues).not.toContain('auth.login.success')
+  })
+
   it('skips disabled collections, internal collections and the audit collection itself', () => {
     const result = apply({ disabledCollections: ['pages'] })
     expect(auditHookCount(result, 'pages')).toEqual({ afterChange: 0, afterDelete: 0 })

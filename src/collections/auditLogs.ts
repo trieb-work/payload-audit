@@ -1,6 +1,13 @@
 import type { Access, CollectionConfig, CollectionSlug, Field } from 'payload'
 
-import type { AuditAccessConfig, AuditDelegationConfig, AuditExtraAction } from '../types'
+import type {
+  AuditAccessConfig,
+  AuditDelegationConfig,
+  AuditExtraAction,
+  ResolvedAuditAuthEventsConfig,
+} from '../types'
+
+import { BUILT_IN_AUTH_ACTION_OPTIONS } from '../utils/resolveAuthEvents'
 
 /** Default read access: any authenticated user may read the audit trail. */
 const defaultReadAccess: Access = ({ req }) => Boolean(req.user)
@@ -13,6 +20,8 @@ export interface BuildAuditLogsCollectionArgs {
   access?: AuditAccessConfig
   /** Auth-enabled collection slugs, used to shape the `actor` relationship. */
   authCollectionSlugs: string[]
+  /** When enabled, built-in `auth.*` actions are added to the select. */
+  authEvents?: ResolvedAuditAuthEventsConfig
   /**
    * Delegation configuration. When `enabled` is not `false`, the collection
    * gains `onBehalfOf` and `delegationChain` fields to record RFC 8693-style
@@ -53,10 +62,22 @@ export interface BuildAuditLogsCollectionArgs {
  * any authenticated user and can be tightened via the plugin's `access.read`.
  */
 export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): CollectionConfig {
-  const { slug, access, authCollectionSlugs, delegation, extraActions, forensics, multiTenant } =
-    args
+  const {
+    slug,
+    access,
+    authCollectionSlugs,
+    authEvents,
+    delegation,
+    extraActions,
+    forensics,
+    multiTenant,
+  } = args
 
   const builtInActionValues = new Set(['create', 'delete', 'file_delete', 'file_upload', 'update'])
+  const authActionOptions = authEvents?.enabled !== false ? [...BUILT_IN_AUTH_ACTION_OPTIONS] : []
+  for (const option of authActionOptions) {
+    builtInActionValues.add(option.value)
+  }
   const seenActionValues = new Set(builtInActionValues)
   const extraActionOptions = (extraActions ?? [])
     .map((action) =>
@@ -94,6 +115,7 @@ export function buildAuditLogsCollection(args: BuildAuditLogsCollectionArgs): Co
         { label: 'Delete', value: 'delete' },
         { label: 'File upload', value: 'file_upload' },
         { label: 'File delete', value: 'file_delete' },
+        ...authActionOptions,
         ...extraActionOptions,
       ],
       required: true,

@@ -315,6 +315,100 @@ describe('audit logging (delegation)', () => {
   })
 })
 
+describe('auth events (native Payload)', () => {
+  it('logs login.success and does not record a user update for the session write', async () => {
+    const email = `auth-login-${Date.now()}@payload-audit.local`
+    const user = await payload.create({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+    })
+    const id = String(user.id)
+    const updatesBefore = (await entriesFor('users', id)).filter(
+      (e) => e.action === 'update',
+    ).length
+
+    await payload.login({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+      req: { headers: headers() } as never,
+    })
+
+    const entries = await entriesFor('users', id)
+    const logins = entries.filter((e) => e.action === 'auth.login.success')
+    expect(logins).toHaveLength(1)
+    expect(logins[0].docTitle).toBe(email)
+    expect(logins[0].actor).toMatchObject({ id: user.id })
+    expect(logins[0].ipAddress).toBe('203.0.113.7')
+    const updatesAfter = entries.filter((e) => e.action === 'update').length
+    expect(updatesAfter).toBe(updatesBefore)
+  })
+
+  it('still audits a host afterLogin write on a different collection', async () => {
+    const title = `login-side-write-${Date.now()}`
+    const usersConfig = payload.collections.users.config
+    const hostHook = async ({ req }: { req: { context?: unknown } }) => {
+      await payload.create({
+        collection: 'posts',
+        data: { title },
+        req: req as never,
+      })
+    }
+    usersConfig.hooks.afterLogin = [hostHook, ...(usersConfig.hooks.afterLogin ?? [])]
+
+    try {
+      const email = `auth-skip-leak-${Date.now()}@payload-audit.local`
+      await payload.create({
+        collection: 'users',
+        data: { email, password: 'test-pass-1' },
+      })
+      await payload.login({
+        collection: 'users',
+        data: { email, password: 'test-pass-1' },
+        req: { headers: headers() } as never,
+      })
+
+      const posts = await payload.find({
+        collection: 'posts',
+        limit: 1,
+        overrideAccess: true,
+        where: { title: { equals: title } },
+      })
+      expect(posts.docs).toHaveLength(1)
+      const actions = (await entriesFor('posts', String(posts.docs[0].id))).map((e) => e.action)
+      expect(actions).toContain('create')
+    } finally {
+      usersConfig.hooks.afterLogin = (usersConfig.hooks.afterLogin ?? []).filter(
+        (hook) => hook !== hostHook,
+      )
+    }
+  })
+
+  it('still audits writes reused on the login request after login returns', async () => {
+    const email = `auth-skip-reuse-${Date.now()}@payload-audit.local`
+    await payload.create({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+    })
+    const req = { context: {}, headers: headers() } as never
+    await payload.login({
+      collection: 'users',
+      data: { email, password: 'test-pass-1' },
+      req,
+    })
+
+    const post = await payload.create({
+      collection: 'posts',
+      data: { title: `after-login-req-${Date.now()}` },
+      req,
+    })
+    const createdId = String(post.id)
+    expect((await entriesFor('posts', createdId)).map((e) => e.action)).toContain('create')
+
+    await payload.delete({ id: post.id, collection: 'posts', req })
+    expect((await entriesFor('posts', createdId)).map((e) => e.action)).toContain('delete')
+  })
+})
+
 describe('audit logging (immutability)', () => {
   it('denies creating audit entries through the API without overrideAccess', async () => {
     await expect(

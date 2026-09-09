@@ -11,6 +11,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/int/**/*.int.spec.ts'],
+    fileParallelism: false,
     hookTimeout: 60_000,
     testTimeout: 60_000,
     coverage: {
@@ -18,6 +19,11 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
       exclude: ['node_modules', 'dist', '**/*.d.ts'],
+    },
+    server: {
+      deps: {
+        inline: ['@trieb.work/payload-auth-pwless', 'payload-auth'],
+      },
     },
   },
 })

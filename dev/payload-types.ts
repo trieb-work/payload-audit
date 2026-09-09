@@ -227,6 +227,12 @@ export interface AuditLog {
     | 'delete'
     | 'file_upload'
     | 'file_delete'
+    | 'auth.login.success'
+    | 'auth.login.failure'
+    | 'auth.logout'
+    | 'auth.token.refresh'
+    | 'auth.account.locked'
+    | 'auth.password.forgot'
     | 'impersonation.started'
     | 'impersonation.ended';
   /**
